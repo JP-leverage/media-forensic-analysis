@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whop Forensics — Corrected</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060609;--surface:#0e0e15;--surface2:#161620;--surface3:#1e1e2c;--border:#252538;--text:#eaeaf2;--text-dim:#7b7b96;--text-mid:#a5a5be;--green:#34d399;--green-dim:rgba(52,211,153,.1);--red:#f87171;--red-dim:rgba(248,113,113,.1);--red-deep:rgba(248,113,113,.05);--amber:#fbbf24;--amber-dim:rgba(251,191,36,.1);--blue:#60a5fa;--blue-dim:rgba(96,165,250,.1);--purple:#c084fc;--purple-dim:rgba(192,132,252,.1)}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;line-height:1.6}
+.container{max-width:1440px;margin:0 auto;padding:20px 28px}
+.header{padding:36px 0 20px;margin-bottom:24px}.header h1{font-size:30px;font-weight:700;letter-spacing:-.8px;background:linear-gradient(135deg,#eaeaf2 40%,#7b7b96);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .meta{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap}.header .meta span{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface);padding:5px 12px;border-radius:6px;border:1px solid var(--border)}
+.tabs{display:flex;gap:2px;margin-bottom:24px;background:var(--surface);border-radius:10px;padding:3px;width:fit-content;border:1px solid var(--border)}.tab{padding:9px 20px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text-dim);transition:all .15s;user-select:none}.tab:hover{color:var(--text-mid)}.tab.active{background:var(--surface3);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.4)}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:24px}.kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px}.kpi .label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-dim);margin-bottom:6px}.kpi .value{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;letter-spacing:-.5px}.kpi .sub{font-size:11px;color:var(--text-dim);margin-top:3px}.kpi .sub b{color:var(--text-mid)}.kpi.red .value{color:var(--red)}.kpi.green .value{color:var(--green)}.kpi.amber .value{color:var(--amber)}.kpi.blue .value{color:var(--blue)}.kpi.purple .value{color:var(--purple)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:16px}.card h3{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.badge{font-size:9.5px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.8px}.badge-red{background:var(--red-dim);color:var(--red)}.badge-amber{background:var(--amber-dim);color:var(--amber)}.badge-green{background:var(--green-dim);color:var(--green)}.badge-blue{background:var(--blue-dim);color:var(--blue)}.badge-purple{background:var(--purple-dim);color:var(--purple)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;padding:8px 10px;color:var(--text-dim);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)}td{padding:9px 10px;border-bottom:1px solid rgba(37,37,56,.6);font-family:'JetBrains Mono',monospace;font-size:11.5px}tr:last-child td{border-bottom:none}.text-right{text-align:right}.text-red{color:var(--red)}.text-green{color:var(--green)}.text-amber{color:var(--amber)}.text-blue{color:var(--blue)}.text-purple{color:var(--purple)}.text-dim{color:var(--text-dim)}
+.insight{background:var(--surface2);border-left:3px solid var(--amber);padding:16px 18px;border-radius:0 8px 8px 0;margin:14px 0;font-size:13px;line-height:1.75}.insight.critical{border-left-color:var(--red);background:var(--red-deep)}.insight.info{border-left-color:var(--blue)}.insight.good{border-left-color:var(--green)}.insight strong{font-weight:700}
+.explain{background:var(--surface2);border-radius:8px;padding:16px 18px;margin:12px 0;font-size:12.5px;line-height:1.8;color:var(--text-mid)}.explain .title{font-weight:700;color:var(--text);font-size:13px;margin-bottom:6px}.explain .stat-line{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(37,37,56,.5)}.explain .stat-line:last-child{border-bottom:none}.explain .stat-line .lbl{color:var(--text-dim)}.explain .stat-line .val{font-family:'JetBrains Mono',monospace;color:var(--text);font-weight:600}
+.chart-wrap{position:relative;height:260px}
+.pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700}.pill-lost{background:var(--red-dim);color:var(--red)}.pill-won{background:var(--green-dim);color:var(--green)}.pill-pending{background:var(--amber-dim);color:var(--amber)}
+.section-title{font-size:17px;font-weight:700;margin:28px 0 14px;padding-top:14px;border-top:1px solid var(--border)}
+.tab-content{display:none}.tab-content.active{display:block}
+.risk-item{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:8px;margin-bottom:6px}.risk-item .metric-name{font-size:12.5px;font-weight:600}.risk-item .metric-val{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700}.risk-green{background:var(--green-dim)}.risk-green .metric-val{color:var(--green)}.risk-red{background:var(--red-dim)}.risk-red .metric-val{color:var(--red)}.risk-amber{background:var(--amber-dim)}.risk-amber .metric-val{color:var(--amber)}
+.waterfall-row{display:flex;align-items:center;margin-bottom:4px;font-size:12px}.waterfall-label{width:260px;color:var(--text-mid);font-size:12px}.waterfall-bar-area{flex:1;position:relative;height:28px}.waterfall-bar{position:absolute;height:100%;border-radius:4px;display:flex;align-items:center;padding:0 10px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;white-space:nowrap}.waterfall-amount{width:110px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;padding-left:10px}
+.timeline-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}.dot-green{background:var(--green)}.dot-amber{background:var(--amber)}.dot-red{background:var(--red)}.dot-blue{background:var(--blue)}.dot-purple{background:var(--purple)}
+.histo-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:11.5px}.histo-label{width:80px;font-family:'JetBrains Mono',monospace;color:var(--text-dim);text-align:right;flex-shrink:0}.histo-bar-wrap{flex:1;height:24px;background:var(--surface2);border-radius:4px;overflow:hidden}.histo-bar{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#fff;min-width:fit-content}.histo-right{width:120px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);text-align:right;flex-shrink:0}
+@media(max-width:1000px){.grid-2,.grid-3{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Transaction Forensics — Corrected Exposure</h1>
+    <div class="meta">
+      <span>Whop.com</span>
+      <span>Aug 2024 → Mar 2026</span>
+      <span>967 paid · $3.58M gross</span>
+      <span style="color:var(--red);border-color:rgba(248,113,113,.3)">SALES BEING SHUT DOWN</span>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="exposure">Exposure Breakdown</div>
+    <div class="tab" data-tab="refunds">Refunds vs Disputes</div>
+    <div class="tab" data-tab="splitit">Splitit Deep Dive</div>
+    <div class="tab" data-tab="forward">Forward Risk</div>
+    <div class="tab" data-tab="actions">Actions</div>
+  </div>
+
+  <!-- ============ EXPOSURE BREAKDOWN ============ -->
+  <div id="exposure" class="tab-content active">
+
+    <div class="insight critical">
+      <strong>Correction from previous analysis:</strong> I was NOT double-counting in the total, but the breakdown was unclear. Here's why: the "Refunded amount" column in Whop's export <em>already includes</em> dispute-forced refunds (sub_status = resolution_lost and dispute_lost). So the $379K refund total already contains $116K that was caused by disputes. Meanwhile, $59K in dispute losses have NO refund recorded — they show up only in the disputes table. The correct approach is: Refund column ($379K) + dispute losses not in refund column ($59K) + pending disputes ($13K) = $451K. You confirmed this — 3 of 4 Feb 2026 "refunds" were actually dispute_lost outcomes ($10.8K), not voluntary refunds.
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi blue"><div class="label">Gross Revenue</div><div class="value">$3.58M</div><div class="sub">967 paid transactions</div></div>
+      <div class="kpi red"><div class="label">Money Gone</div><div class="value">$438.7K</div><div class="sub">Refunded + dispute losses</div></div>
+      <div class="kpi amber"><div class="label">Money At Risk</div><div class="value">$12.5K</div><div class="sub">7 pending disputes</div></div>
+      <div class="kpi green"><div class="label">Money Saved</div><div class="value">$52.2K</div><div class="sub">Disputes won</div></div>
+    </div>
+
+    <div class="card">
+      <h3>Total Exposure Waterfall — Where The Money Went <span class="badge badge-red">No Double Counting</span></h3>
+      
+      <div class="explain" style="margin-bottom:20px">
+        <div class="title">How this is calculated</div>
+        Whop records refunds in two systems. The <strong>Refunded amount</strong> column in the payments export captures money returned to customers — whether you chose to refund voluntarily OR were forced to by a lost dispute. The <strong>disputes table</strong> captures chargebacks. Some payments appear in both (the customer filed a dispute AND a refund was issued). To avoid double-counting, I checked every Payment ID and separated them into 5 mutually exclusive buckets.
+      </div>
+
+      <table>
+        <tr><th>Category</th><th>What It Is</th><th class="text-right">Count</th><th class="text-right">Amount</th></tr>
+        <tr>
+          <td style="font-family:'DM Sans'"><span class="dot-blue timeline-dot"></span><strong>Pure Voluntary Refunds</strong></td>
+          <td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">You chose to refund. No dispute involved. Sub status = refunded or partially_refunded, payment ID NOT in disputes table.</td>
+          <td class="text-right">68</td>
+          <td class="text-right text-blue"><strong>$255,617</strong></td>
+        </tr>
+        <tr>
+          <td style="font-family:'DM Sans'"><span class="dot-purple timeline-dot"></span><strong>Resolution Lost</strong></td>
+          <td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">Forced reversals recorded in refund column with sub_status=resolution_lost. These do NOT appear in the disputes table — they're a separate Whop/Stripe mechanism (bank reversals, Splitit hold releases).</td>
+          <td class="text-right">19</td>
+          <td class="text-right text-purple"><strong>$96,960</strong></td>
+        </tr>
+        <tr>
+          <td style="font-family:'DM Sans'"><span class="dot-red timeline-dot"></span><strong>Dispute-Forced Refunds (Overlap)</strong></td>
+          <td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">Payment appears in BOTH refund column AND disputes table. The refund was issued because a dispute was lost. Sub_status=dispute_lost. The dispute amount is typically a single installment; the refund is the remaining balance you returned proactively after losing. <strong>Includes your Feb 2026 refunds.</strong></td>
+          <td class="text-right">4</td>
+          <td class="text-right text-red"><strong>$19,498</strong></td>
+        </tr>
+        <tr>
+          <td style="font-family:'DM Sans'"><span class="dot-amber timeline-dot"></span><strong>Voluntary Refund + Dispute Won</strong></td>
+          <td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">You refunded the customer AND they also filed a dispute, but you won the dispute. The refund is in the column; the dispute $ was returned to you.</td>
+          <td class="text-right">2</td>
+          <td class="text-right text-amber"><strong>$7,250</strong></td>
+        </tr>
+        <tr style="border-top:2px solid var(--border)">
+          <td style="font-family:'DM Sans'" colspan="2"><strong>= Total in Refunded Amount Column</strong></td>
+          <td class="text-right"><strong>93</strong></td>
+          <td class="text-right"><strong>$379,325</strong></td>
+        </tr>
+      </table>
+
+      <div style="height:16px"></div>
+
+      <table>
+        <tr><th>Category</th><th>What It Is</th><th class="text-right">Count</th><th class="text-right">Amount</th></tr>
+        <tr>
+          <td style="font-family:'DM Sans'"><span class="dot-red timeline-dot"></span><strong>Pure Dispute Losses</strong></td>
+          <td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">Disputes that were lost where Refunded amount = $0 in the payments table. Money was taken directly via chargeback — never recorded as a "refund."</td>
+          <td class="text-right">19</td>
+          <td class="text-right text-red"><strong>$59,398</strong></td>
+        </tr>
+        <tr>
+          <td style="font-family:'DM Sans'"><span class="dot-amber timeline-dot"></span><strong>Pending Disputes</strong></td>
+          <td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">Open cases (under_review, needs_response, warning_under_review). No refund recorded yet. Could go either way.</td>
+          <td class="text-right">7</td>
+          <td class="text-right text-amber"><strong>$12,542</strong></td>
+        </tr>
+        <tr>
+          <td style="font-family:'DM Sans'"><span class="dot-green timeline-dot"></span><strong>Pure Dispute Wins</strong></td>
+          <td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">Disputes won where no refund was issued. You kept the money.</td>
+          <td class="text-right">13</td>
+          <td class="text-right text-green"><strong>$46,817</strong></td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Corrected Total Exposure</h3>
+      <div class="grid-3">
+        <div class="explain" style="margin:0">
+          <div class="title" style="color:var(--red)">Money Gone</div>
+          <div class="stat-line"><span class="lbl">Refund column total</span><span class="val">$379,325</span></div>
+          <div class="stat-line"><span class="lbl">+ Pure dispute losses</span><span class="val">$59,398</span></div>
+          <div class="stat-line" style="border-top:2px solid var(--border);padding-top:8px"><span class="lbl"><strong>Total Gone</strong></span><span class="val text-red"><strong>$438,723</strong></span></div>
+        </div>
+        <div class="explain" style="margin:0">
+          <div class="title" style="color:var(--amber)">At Risk</div>
+          <div class="stat-line"><span class="lbl">Pending disputes</span><span class="val">$12,542</span></div>
+          <div class="stat-line"><span class="lbl">Cases</span><span class="val">7 open</span></div>
+          <div class="stat-line" style="border-top:2px solid var(--border);padding-top:8px"><span class="lbl"><strong>Total At Risk</strong></span><span class="val text-amber"><strong>$12,542</strong></span></div>
+        </div>
+        <div class="explain" style="margin:0">
+          <div class="title" style="color:var(--green)">Saved</div>
+          <div class="stat-line"><span class="lbl">Disputes won (pure)</span><span class="val">$46,817</span></div>
+          <div class="stat-line"><span class="lbl">Disputes won (overlap)</span><span class="val">$5,417</span></div>
+          <div class="stat-line" style="border-top:2px solid var(--border);padding-top:8px"><span class="lbl"><strong>Total Saved</strong></span><span class="val text-green"><strong>$52,234</strong></span></div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px">
+        <div class="risk-item risk-red" style="font-size:14px">
+          <span class="metric-name">Total Exposure (Gone + At Risk)</span>
+          <span class="metric-val">$451,264 (12.6% of $3.58M)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Credits Ledger Cross-Check <span class="badge badge-blue">Balance Verification</span></h3>
+      <div class="explain">
+        <div class="title">Your credits ledger tells a consistent story</div>
+        The ledger records refunds and disputes as separate line items. They confirm there is no double-counting:
+      </div>
+      <table>
+        <tr><th>Credit Type</th><th>Meaning</th><th class="text-right">Amount</th><th class="text-right">Entries</th></tr>
+        <tr><td>payment_refund</td><td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">Refunds issued (money out)</td><td class="text-right text-red">-$256,972</td><td class="text-right">72</td></tr>
+        <tr><td>payment_dispute</td><td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">Chargebacks (money out)</td><td class="text-right text-red">-$62,340</td><td class="text-right">28</td></tr>
+        <tr><td>payment_dispute_reversal</td><td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">Won disputes (money back)</td><td class="text-right text-green">+$15,667</td><td class="text-right">8</td></tr>
+        <tr><td>payment_dispute_fee</td><td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">Fees charged per dispute</td><td class="text-right text-red">-$225</td><td class="text-right">15</td></tr>
+        <tr><td>clawback</td><td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">Other recoveries/adjustments</td><td class="text-right text-green">+$34,400</td><td class="text-right">13</td></tr>
+        <tr style="background:var(--surface2)">
+          <td colspan="2"><strong>Net refund + dispute impact</strong></td>
+          <td class="text-right text-red"><strong>-$269,471</strong></td>
+          <td></td>
+        </tr>
+      </table>
+      <div class="insight info" style="margin-top:12px">
+        <strong>Why the ledger total ($269K) differs from payments total ($379K + $59K):</strong> The ledger only captures entries that have been finalized and hit your balance. The payments export captures the full refunded amount including amounts that were collected in installments over time. For overlap cases (dispute_lost refunds), the ledger shows both a dispute debit and a separate refund credit. The dispute_hold_rebalance entries net these out. Additionally, not all 93 refunds from the payments table appear in the credits ledger (72 vs 93) — the remaining 21 may be processing or captured differently in Whop's system.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Feb 2026 Refunds — Your Specific Question <span class="badge badge-purple">Verified</span></h3>
+      <div class="explain">
+        <div class="title">You were right — 3 of 4 Feb 2026 "refunds" were dispute-caused</div>
+        February 2026 had 4 refunds totaling $14,706. Here's the breakdown:
+      </div>
+      <table>
+        <tr><th>Customer</th><th>Sub Status</th><th class="text-right">Refund $</th><th class="text-right">Dispute $</th><th>What Happened</th></tr>
+        <tr>
+          <td style="font-size:10.5px">info@cashinvestor...</td>
+          <td><span class="pill pill-lost">dispute_lost</span></td>
+          <td class="text-right">$2,081</td>
+          <td class="text-right">$208</td>
+          <td style="font-family:'DM Sans';font-size:10.5px;color:var(--text-mid)">Lost $208 dispute in Nov '25 → you refunded remaining $2,081 in Feb '26</td>
+        </tr>
+        <tr>
+          <td style="font-size:10.5px"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="bbcbd0d2d68b8a898dfbdcd6dad2d795d8d4d6">[email&#160;protected]</a></td>
+          <td><span class="pill pill-lost">dispute_lost</span></td>
+          <td class="text-right">$5,042</td>
+          <td class="text-right">$458</td>
+          <td style="font-family:'DM Sans';font-size:10.5px;color:var(--text-mid)">Lost $458 dispute in Jan '26 → you refunded remaining $5,042 in Feb '26</td>
+        </tr>
+        <tr>
+          <td style="font-size:10.5px">christianogoro@...</td>
+          <td><span class="pill pill-lost">dispute_lost</span></td>
+          <td class="text-right">$3,667</td>
+          <td class="text-right">$458</td>
+          <td style="font-family:'DM Sans';font-size:10.5px;color:var(--text-mid)">Lost $458 dispute in Jan '26 → you refunded remaining $3,667 in Feb '26</td>
+        </tr>
+        <tr>
+          <td style="font-size:10.5px"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="aec3c1c4cfcac5eed7cfc6c1c180cdc1c3">[email&#160;protected]</a></td>
+          <td><span class="pill pill-pending">partially_refunded</span></td>
+          <td class="text-right">$3,917</td>
+          <td class="text-right">—</td>
+          <td style="font-family:'DM Sans';font-size:10.5px;color:var(--text-mid)">Voluntary partial refund — no dispute</td>
+        </tr>
+      </table>
+      <div class="insight" style="margin-top:12px">
+        <strong>The pattern:</strong> A customer disputes one Splitit installment ($458). You lose the dispute. Then you refund the entire remaining balance ($3,667-$5,042) rather than risk more disputes on future installments. The dispute amount is small, but it triggers a much larger refund. This is the "dispute cascade" — a $458 lost dispute causes a $5,042 refund. For these 3 cases alone, $1,125 in disputes cascaded into $10,789 in refunds.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ REFUNDS VS DISPUTES ============ -->
+  <div id="refunds" class="tab-content">
+    <div class="kpi-row">
+      <div class="kpi blue"><div class="label">Pure Voluntary Refunds</div><div class="value">$255.6K</div><div class="sub">68 transactions · you chose to refund</div></div>
+      <div class="kpi purple"><div class="label">Resolution Lost</div><div class="value">$97.0K</div><div class="sub">19 forced reversals</div></div>
+      <div class="kpi red"><div class="label">Dispute-Caused (All)</div><div class="value">$78.9K</div><div class="sub">$19.5K overlap + $59.4K pure</div></div>
+      <div class="kpi amber"><div class="label">Pending</div><div class="value">$12.5K</div><div class="sub">7 open cases</div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Exposure Composition</h3>
+        <div class="chart-wrap"><canvas id="compositionChart"></canvas></div>
+        <div class="explain" style="margin-top:10px">
+          <div class="title">What this tells you</div>
+          <strong>58% of your exposure is voluntary refunds</strong> ($256K) — these are decisions you made. Another 22% is resolution_lost ($97K) — forced by payment processor mechanics (mostly Splitit hold releases). Only 18% is from actual dispute chargebacks ($79K). This means the majority of your bleed is self-inflicted or Splitit-structural, not customer fraud.
+        </div>
+      </div>
+      <div class="card">
+        <h3>Dispute Outcomes</h3>
+        <div class="chart-wrap"><canvas id="disputeOutcomeChart"></canvas></div>
+        <div class="explain" style="margin-top:10px">
+          <div class="title">Dispute resolution breakdown</div>
+          Of 45 total disputes, you won 15 ($52K), lost 23 ($61K), and have 7 pending ($13K). Your 39.5% win rate by count / 46% by dollar is below average for digital products. But the bigger concern is the <strong>cascade effect</strong> — losing small Splitit installment disputes triggers you to refund the entire remaining balance.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>The Dispute Cascade Effect <span class="badge badge-red">Critical Pattern</span></h3>
+      <div class="explain">
+        <div class="title">When a $458 dispute costs you $5,042</div>
+        In 4 cases, a customer disputed a single Splitit installment ($208-$792). You lost the dispute. Then you proactively refunded the entire remaining balance to avoid further disputes on future installments. Here's the math:
+      </div>
+      <table>
+        <tr><th>Customer</th><th class="text-right">Original Payment</th><th class="text-right">Dispute Amount</th><th class="text-right">Refund Triggered</th><th class="text-right">Total Lost</th><th class="text-right">Cascade Ratio</th></tr>
+        <tr><td style="font-size:10.5px">montellore@</td><td class="text-right">$9,500</td><td class="text-right">$792</td><td class="text-right">$8,708</td><td class="text-right text-red">$9,500</td><td class="text-right text-red">12x</td></tr>
+        <tr><td style="font-size:10.5px">pkim0126@</td><td class="text-right">$5,500</td><td class="text-right">$458</td><td class="text-right">$5,042</td><td class="text-right text-red">$5,500</td><td class="text-right text-red">12x</td></tr>
+        <tr><td style="font-size:10.5px">christianogoro@</td><td class="text-right">$5,500</td><td class="text-right">$458</td><td class="text-right">$3,667</td><td class="text-right text-red">$4,125</td><td class="text-right text-red">9x</td></tr>
+        <tr><td style="font-size:10.5px">cashinvestor...</td><td class="text-right">$2,497</td><td class="text-right">$208</td><td class="text-right">$2,081</td><td class="text-right text-red">$2,289</td><td class="text-right text-red">11x</td></tr>
+        <tr style="background:var(--surface2)"><td colspan="2"><strong>Totals</strong></td><td class="text-right"><strong>$1,916</strong></td><td class="text-right"><strong>$19,498</strong></td><td class="text-right text-red"><strong>$21,414</strong></td><td class="text-right text-red"><strong>11x avg</strong></td></tr>
+      </table>
+      <div class="insight critical" style="margin-top:12px">
+        <strong>$1,916 in dispute losses cascaded into $19,498 in refunds.</strong> The disputes themselves are small (single installments), but each one forces a full-balance refund. This is the Splitit trap: the BNPL structure creates multiple dispute entry points (each installment), and losing any one of them means losing the whole deal. On average, each $1 in Splitit dispute loss costs you $11 in cascaded refunds.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Resolution Lost — What Are These?</h3>
+      <div class="explain">
+        <div class="title">19 transactions, $96,960 — NOT in the disputes table</div>
+        These have sub_status="resolution_lost" in the payments table but do NOT appear in your disputes export. This means they were resolved outside the formal dispute process — likely Splitit hold releases, bank-initiated reversals, or payment processor auto-reversals. All 19 are Splitit transactions.
+      </div>
+      <table>
+        <tr><th>Metric</th><th class="text-right">Value</th></tr>
+        <tr><td>Count</td><td class="text-right">19</td></tr>
+        <tr><td>Total</td><td class="text-right text-purple">$96,960</td></tr>
+        <tr><td>Average</td><td class="text-right">$5,103</td></tr>
+        <tr><td>All Splitit?</td><td class="text-right text-red">Yes — 19/19</td></tr>
+        <tr><td>% of all Splitit revenue</td><td class="text-right">10.4%</td></tr>
+      </table>
+      <div class="insight" style="margin-top:10px">
+        <strong>These are Splitit's mechanics at work.</strong> Splitit holds funds on the customer's card rather than charging upfront. When the customer's bank releases the hold or the customer disputes with their bank directly, Splitit reverses the charge and it shows up as "resolution_lost" — not a formal chargeback. This is a structural risk of Splitit that doesn't exist with card payments or other BNPL providers like Affirm (which pays you upfront).
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SPLITIT DEEP DIVE ============ -->
+  <div id="splitit" class="tab-content">
+    <div class="kpi-row">
+      <div class="kpi red"><div class="label">Splitit Refund Rate</div><div class="value">23.3%</div><div class="sub">42 of 152 transactions</div></div>
+      <div class="kpi red"><div class="label">Splitit Total Loss</div><div class="value">$218.3K</div><div class="sub">Refunds + resolution_lost</div></div>
+      <div class="kpi"><div class="label">Avg Days to Refund</div><div class="value">78.6d</div><div class="sub">Median: 76 · Spread: 2 to 219 days</div></div>
+      <div class="kpi"><div class="label">Avg Payment Size</div><div class="value">$6,155</div><div class="sub">vs $2,869 for card (2.1x larger)</div></div>
+    </div>
+
+    <div class="card">
+      <h3>Splitit Refund Distribution — 3 Distinct Clusters</h3>
+      <div class="grid-3">
+        <div class="explain" style="margin:0">
+          <div class="title"><span class="timeline-dot dot-green"></span>Early (&lt;60d): 14 refunds (33%)</div>
+          <div class="stat-line"><span class="lbl">Total</span><span class="val">$84,217</span></div>
+          <div class="stat-line"><span class="lbl">Avg amount</span><span class="val">$6,015</span></div>
+          <div class="stat-line"><span class="lbl">Full refunds</span><span class="val">8 of 14</span></div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text-dim);line-height:1.6">Payment shock + quick exits. 8 came in first 2 weeks. These are buyers who regret immediately. Most are full refunds.</div>
+        </div>
+        <div class="explain" style="margin:0">
+          <div class="title"><span class="timeline-dot dot-amber"></span>Mid (60-100d): 13 refunds (31%)</div>
+          <div class="stat-line"><span class="lbl">Total</span><span class="val">$62,567</span></div>
+          <div class="stat-line"><span class="lbl">Avg amount</span><span class="val">$4,813</span></div>
+          <div class="stat-line"><span class="lbl">Partial refunds</span><span class="val">10 of 13</span></div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text-dim);line-height:1.6"><strong>Installment cliff.</strong> 2-3 payments in, customers hit "is this worth it?" Most are partial — they've paid some installments and get back the rest.</div>
+        </div>
+        <div class="explain" style="margin:0">
+          <div class="title"><span class="timeline-dot dot-red"></span>Late (100+d): 15 refunds (36%)</div>
+          <div class="stat-line"><span class="lbl">Total</span><span class="val">$71,564</span></div>
+          <div class="stat-line"><span class="lbl">Avg amount</span><span class="val">$4,771</span></div>
+          <div class="stat-line"><span class="lbl">Partial refunds</span><span class="val">13 of 15</span></div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text-dim);line-height:1.6">"Used and refunded." 3-7 months of access. Includes dispute cascades. Some had 4-5 months of content consumption before requesting refund.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Granular Splitit Timing</h3>
+      <div id="splititHisto"></div>
+    </div>
+
+    <div class="card">
+      <h3>Splitit vs Card Comparison</h3>
+      <table>
+        <tr><th>Metric</th><th class="text-right">Card</th><th class="text-right">Splitit</th><th class="text-right">Takeaway</th></tr>
+        <tr><td>Transactions</td><td class="text-right">716</td><td class="text-right">152</td><td class="text-right text-dim">—</td></tr>
+        <tr><td>Revenue</td><td class="text-right">$2,053,959</td><td class="text-right">$935,629</td><td class="text-right text-dim">—</td></tr>
+        <tr><td>Avg payment</td><td class="text-right">$2,869</td><td class="text-right text-amber">$6,155</td><td class="text-right" style="font-family:'DM Sans';font-size:10.5px;color:var(--text-mid)">Splitit buyers buy bigger</td></tr>
+        <tr><td>Refund count</td><td class="text-right">44</td><td class="text-right text-red">42</td><td class="text-right" style="font-family:'DM Sans';font-size:10.5px;color:var(--text-mid)">Nearly identical counts</td></tr>
+        <tr><td>Refund rate ($)</td><td class="text-right">6.1%</td><td class="text-right text-red">23.3%</td><td class="text-right" style="font-family:'DM Sans';font-size:10.5px;color:var(--red)">3.8x higher</td></tr>
+        <tr><td>Median days to refund</td><td class="text-right">10 days</td><td class="text-right text-red">76 days</td><td class="text-right" style="font-family:'DM Sans';font-size:10.5px;color:var(--red)">7.6x slower</td></tr>
+        <tr><td>Resolution lost count</td><td class="text-right">0</td><td class="text-right text-red">19</td><td class="text-right" style="font-family:'DM Sans';font-size:10.5px;color:var(--red)">Splitit-only problem</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ FORWARD RISK ============ -->
+  <div id="forward" class="tab-content">
+    <div class="insight critical">
+      <strong>With sales being shut down, your exposure is now a fixed pool.</strong> No new revenue is coming in to offset future refunds and disputes. What matters now is: how much of your existing customer base is still within the refund/chargeback window, and what's the probable loss?
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi amber"><div class="label">Pending Disputes</div><div class="value">$12.5K</div><div class="sub">7 cases · known risk</div></div>
+      <div class="kpi red"><div class="label">Splitit Customers at Risk</div><div class="value">105</div><div class="sub">$640K in payments · no refund yet</div></div>
+      <div class="kpi amber"><div class="label">Projected Splitit Exposure</div><div class="value">$149.2K</div><div class="sub">At historical 23.3% rate</div></div>
+      <div class="kpi amber"><div class="label">Recent Customers at Risk</div><div class="value">196</div><div class="sub">Paid since Sep '25 · $753K total</div></div>
+    </div>
+
+    <div class="card">
+      <h3>Remaining Exposure — No New Sales Scenario</h3>
+      <table>
+        <tr><th>Risk Category</th><th>Reasoning</th><th class="text-right">Pool $</th><th class="text-right">Est. Loss Rate</th><th class="text-right">Projected Loss</th></tr>
+        <tr>
+          <td style="font-family:'DM Sans'"><strong>Pending disputes</strong></td>
+          <td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">7 open cases. At your 60.5% loss rate by count.</td>
+          <td class="text-right">$12,542</td>
+          <td class="text-right">60.5%</td>
+          <td class="text-right text-amber">$7,588</td>
+        </tr>
+        <tr>
+          <td style="font-family:'DM Sans'"><strong>Splitit (no refund yet)</strong></td>
+          <td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">105 active Splitit customers with $640K in payments. Historical rate: 23.3%. But since sales are stopping and these customers are aging, the rate may be lower (early refunders already left).</td>
+          <td class="text-right">$640,207</td>
+          <td class="text-right">15-23%</td>
+          <td class="text-right text-red">$96K-$149K</td>
+        </tr>
+        <tr>
+          <td style="font-family:'DM Sans'"><strong>Card/other (since Sep '25)</strong></td>
+          <td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">Still within 180-day chargeback window. Card refund rate is 6.1%, but these customers have already passed the early-exit window.</td>
+          <td class="text-right">$753,303</td>
+          <td class="text-right">3-6%</td>
+          <td class="text-right text-amber">$23K-$45K</td>
+        </tr>
+        <tr>
+          <td style="font-family:'DM Sans'"><strong>Future dispute cascades</strong></td>
+          <td style="font-family:'DM Sans';font-size:11px;color:var(--text-mid)">If any of the 105 Splitit customers dispute one installment, the cascade pattern (11x avg) could trigger large refunds.</td>
+          <td class="text-right">—</td>
+          <td class="text-right">—</td>
+          <td class="text-right text-red">$20K-$50K</td>
+        </tr>
+        <tr style="background:var(--surface2)">
+          <td style="font-family:'DM Sans'" colspan="3"><strong>Total Forward Exposure Range</strong></td>
+          <td></td>
+          <td class="text-right text-red"><strong>$147K-$292K</strong></td>
+        </tr>
+      </table>
+
+      <div class="insight" style="margin-top:16px">
+        <strong>What "no new sales" changes:</strong> Without new revenue, every refund and dispute is a pure cash outflow. Your current Whop balance is <strong>-$9,872</strong> (from the screenshots). With $147K-$292K in projected forward losses, you'll need reserves or a plan to manage the negative balance as existing Splitit installments continue to process and some portion refund/dispute.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>The 105 Active Splitit Customers — Time Bomb?</h3>
+      <div class="explain">
+        <div class="title">These customers have paid $640K but haven't refunded or disputed yet</div>
+        At the historical 23.3% refund rate, ~24 of these 105 customers would be expected to refund, returning ~$149K. However, many have already passed the 90-day mark (the peak refund window), so the actual number may be lower. The key risk is dispute cascades — if even 5-10 of these customers dispute a single installment and you lose, the 11x cascade multiplier could mean $50K-$100K in additional refunds triggered by small dispute losses.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ACTIONS ============ -->
+  <div id="actions" class="tab-content">
+    <div class="insight critical">
+      <strong>Context shift: you're managing a wind-down, not growth.</strong> With sales stopping, the priority is minimizing remaining outflows rather than optimizing conversion. Every dollar refunded or lost in a dispute is now a pure loss with no new revenue to offset it.
+    </div>
+
+    <div class="card">
+      <table>
+        <tr><th style="width:30px">#</th><th>Action</th><th class="text-right" style="width:120px">Est. Impact</th><th style="width:70px">Priority</th></tr>
+        <tr>
+          <td>1</td>
+          <td style="font-family:'DM Sans'">
+            <strong>Cancel remaining Splitit payment plans immediately.</strong><br>
+            <span style="font-size:11.5px;color:var(--text-mid);line-height:1.7">105 active Splitit customers represent $640K in payment volume with a projected $149K in refund exposure. Since you're shutting down sales, there's no reason to let these plans continue accruing. Negotiate with Splitit to close out remaining plans and collect what's owed. Every month you wait, more customers hit the installment cliff.</span>
+          </td>
+          <td class="text-right text-green" style="font-family:'JetBrains Mono'">$96-149K saved</td>
+          <td><span class="pill pill-lost">Urgent</span></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td style="font-family:'DM Sans'">
+            <strong>Fight the 7 pending disputes with maximum evidence.</strong><br>
+            <span style="font-size:11.5px;color:var(--text-mid);line-height:1.7">$12.5K across 7 cases. One is $5K (needs_response — act immediately). For each: compile login timestamps, content access logs, IP records, email engagement history, and signed ToS. Your 60% win rate on late disputes suggests you have good evidence when you try.</span>
+          </td>
+          <td class="text-right text-green" style="font-family:'JetBrains Mono'">$5-8K saved</td>
+          <td><span class="pill pill-lost">Urgent</span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td style="font-family:'DM Sans'">
+            <strong>Stop issuing cascade refunds after losing Splitit disputes.</strong><br>
+            <span style="font-size:11.5px;color:var(--text-mid);line-height:1.7">The pattern of losing a $458 dispute and then voluntarily refunding $5K is costing 11x the dispute amount. Instead: let each installment stand on its own. If they dispute another installment, fight it with evidence. Don't preemptively refund the remaining balance.</span>
+          </td>
+          <td class="text-right text-green" style="font-family:'JetBrains Mono'">$20-50K saved</td>
+          <td><span class="pill pill-lost">Urgent</span></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td style="font-family:'DM Sans'">
+            <strong>Set aside cash reserves for projected losses.</strong><br>
+            <span style="font-size:11.5px;color:var(--text-mid);line-height:1.7">Your Whop balance is already -$9.9K. With $147K-$292K in projected forward losses, you need to plan for this. Set aside reserves equal to the conservative estimate ($147K) and manage cash flow accordingly.</span>
+          </td>
+          <td class="text-right text-amber" style="font-family:'JetBrains Mono'">Cash planning</td>
+          <td><span class="pill pill-pending">High</span></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td style="font-family:'DM Sans'">
+            <strong>Proactive outreach to at-risk Splitit customers.</strong><br>
+            <span style="font-size:11.5px;color:var(--text-mid);line-height:1.7">Contact the 105 active Splitit customers. Offer a structured completion path or reduced remaining payments rather than waiting for refund requests. A customer who settles at 70% of remaining balance is better than one who refunds 100%.</span>
+          </td>
+          <td class="text-right text-green" style="font-family:'JetBrains Mono'">$30-50K saved</td>
+          <td><span class="pill pill-pending">High</span></td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Summary Numbers</h3>
+      <div class="grid-2">
+        <div class="explain" style="margin:0">
+          <div class="title" style="color:var(--red)">Already Lost</div>
+          <div class="stat-line"><span class="lbl">Voluntary refunds</span><span class="val">$255,617</span></div>
+          <div class="stat-line"><span class="lbl">Resolution lost</span><span class="val">$96,960</span></div>
+          <div class="stat-line"><span class="lbl">Dispute-forced refunds</span><span class="val">$19,498</span></div>
+          <div class="stat-line"><span class="lbl">Overlap voluntary+won</span><span class="val">$7,250</span></div>
+          <div class="stat-line"><span class="lbl">Pure dispute losses</span><span class="val">$59,398</span></div>
+          <div class="stat-line" style="border-top:2px solid var(--border);padding-top:8px"><span class="lbl"><strong>Total Gone</strong></span><span class="val text-red"><strong>$438,723</strong></span></div>
+        </div>
+        <div class="explain" style="margin:0">
+          <div class="title" style="color:var(--amber)">Still At Risk</div>
+          <div class="stat-line"><span class="lbl">Pending disputes</span><span class="val">$12,542</span></div>
+          <div class="stat-line"><span class="lbl">Splitit forward exposure</span><span class="val">$96-149K</span></div>
+          <div class="stat-line"><span class="lbl">Card/other forward</span><span class="val">$23-45K</span></div>
+          <div class="stat-line"><span class="lbl">Cascade risk</span><span class="val">$20-50K</span></div>
+          <div class="stat-line" style="border-top:2px solid var(--border);padding-top:8px"><span class="lbl"><strong>Total At Risk</strong></span><span class="val text-amber"><strong>$147-292K</strong></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+Chart.defaults.color='#7b7b96';Chart.defaults.borderColor='rgba(37,37,56,.5)';Chart.defaults.font.family="'DM Sans',sans-serif";Chart.defaults.font.size=11;
+
+// Composition pie
+new Chart(document.getElementById('compositionChart'),{type:'doughnut',data:{labels:['Voluntary Refunds ($256K)','Resolution Lost ($97K)','Dispute-Forced Refunds ($19K)','Pure Dispute Losses ($59K)','Pending ($13K)','Voluntary+Won Overlap ($7K)'],datasets:[{data:[255617,96960,19498,59398,12542,7250],backgroundColor:['rgba(96,165,250,.65)','rgba(192,132,252,.65)','rgba(248,113,113,.65)','rgba(248,113,113,.4)','rgba(251,191,36,.5)','rgba(251,191,36,.3)'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:10,padding:10,font:{size:10}}}}}});
+
+// Dispute outcomes
+new Chart(document.getElementById('disputeOutcomeChart'),{type:'doughnut',data:{labels:['Won ($52K)','Lost ($61K)','Pending ($13K)'],datasets:[{data:[52234,61314,12542],backgroundColor:['rgba(52,211,153,.65)','rgba(248,113,113,.65)','rgba(251,191,36,.5)'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:10,padding:12,font:{size:11}}}}}});
+
+// Cumulative chart
+const MD=[{m:'Aug 24',cr:0},{m:'Sep 24',cr:6.2},{m:'Oct 24',cr:6.4},{m:'Nov 24',cr:6.5},{m:'Dec 24',cr:6.9},{m:'Jan 25',cr:7.3},{m:'Feb 25',cr:8.3},{m:'Mar 25',cr:7.7},{m:'Apr 25',cr:7.1},{m:'May 25',cr:7.3},{m:'Jun 25',cr:8.2},{m:'Jul 25',cr:9.2},{m:'Aug 25',cr:10.4},{m:'Sep 25',cr:11.0},{m:'Oct 25',cr:11.5},{m:'Nov 25',cr:10.8},{m:'Dec 25',cr:10.6},{m:'Jan 26',cr:10.8},{m:'Feb 26',cr:10.6},{m:'Mar 26',cr:10.6}];
+const MD2=[{m:'Aug 24',r:82500,ref:0},{m:'Sep 24',r:77500,ref:10000},{m:'Oct 24',r:185274,ref:12050},{m:'Nov 24',r:143533,ref:9500},{m:'Dec 24',r:265084,ref:20809},{m:'Jan 25',r:281375,ref:23442},{m:'Feb 25',r:275171,ref:33388},{m:'Mar 25',r:191482,ref:7167},{m:'Apr 25',r:212266,ref:5747},{m:'May 25',r:162106,ref:14983},{m:'Jun 25',r:188115,ref:33075},{m:'Jul 25',r:244069,ref:42750},{m:'Aug 25',r:345118,ref:63283},{m:'Sep 25',r:243671,ref:41597},{m:'Oct 25',r:268354,ref:45567},{m:'Nov 25',r:198921,ref:0},{m:'Dec 25',r:99500,ref:5542},{m:'Jan 26',r:58750,ref:10425},{m:'Feb 26',r:39500,ref:0},{m:'Mar 26',r:18000,ref:0}];
+const mLabels=MD.map(d=>d.m);
+
+new Chart(document.getElementById('monthlyChart'),{type:'bar',data:{labels:mLabels,datasets:[{label:'Revenue',data:MD2.map(d=>d.r),backgroundColor:'rgba(96,165,250,.5)',borderRadius:3},{label:'Refunds',data:MD2.map(d=>d.ref),backgroundColor:'rgba(248,113,113,.65)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:10,padding:14,font:{size:10}}}},scales:{y:{ticks:{callback:v=>'$'+Math.round(v/1000)+'K',font:{size:10}}},x:{ticks:{font:{size:9},maxRotation:45}}}}});
+
+new Chart(document.getElementById('cumChart'),{type:'line',data:{labels:mLabels,datasets:[{label:'Cumulative Refund Rate',data:MD.map(d=>d.cr),borderColor:'#f87171',backgroundColor:'rgba(248,113,113,.08)',fill:true,tension:.3,pointRadius:3,pointBackgroundColor:'#f87171'},{label:'8% Threshold',data:MD.map(()=>8),borderColor:'rgba(251,191,36,.4)',borderDash:[5,5],pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:10,padding:14,font:{size:10}}}},scales:{y:{ticks:{callback:v=>v+'%',font:{size:10}},min:0,max:15},x:{ticks:{font:{size:9},maxRotation:45}}}}});
+
+// Splitit histogram
+const sw=[{l:'0-7d',c:4,t:24775,p:10},{l:'8-14d',c:4,t:22800,p:10},{l:'15-30d',c:3,t:24000,p:7},{l:'31-45d',c:1,t:3750,p:2},{l:'46-60d',c:3,t:18392,p:7},{l:'61-75d',c:6,t:23250,p:14},{l:'76-90d',c:6,t:29817,p:14},{l:'91-120d',c:5,t:29025,p:12},{l:'121-150d',c:7,t:26748,p:17},{l:'151-180d',c:2,t:13292,p:5},{l:'180+d',c:1,t:2500,p:2}];
+const mxP=Math.max(...sw.map(w=>w.p));const sh=document.getElementById('splititHisto');
+sw.forEach(w=>{const bW=w.p/mxP*100;const color=w.l.match(/^(61|76)/)?'rgba(248,113,113,.6)':w.l.match(/^(91|12|15|18)/)?'rgba(248,113,113,.45)':'rgba(96,165,250,.5)';sh.innerHTML+=`<div class="histo-row"><div class="histo-label">${w.l}</div><div class="histo-bar-wrap"><div class="histo-bar" style="width:${Math.max(bW,8)}%;background:${color}">${w.c}</div></div><div class="histo-right">${w.p}% · $${(w.t/1000).toFixed(1)}K</div></div>`;});
+
+// Tab switching
+document.querySelec
