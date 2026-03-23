@@ -202,7 +202,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;padd
           <td style="font-family:'DM Sans';font-size:10.5px;color:var(--text-mid)">Lost $208 dispute in Nov '25 → you refunded remaining $2,081 in Feb '26</td>
         </tr>
         <tr>
-          <td style="font-size:10.5px">pkim0126@gmail.com</td>
+          <td style="font-size:10.5px"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="bbcbd0d2d68b8a898dfbdcd6dad2d795d8d4d6">[email&#160;protected]</a></td>
           <td><span class="pill pill-lost">dispute_lost</span></td>
           <td class="text-right">$5,042</td>
           <td class="text-right">$458</td>
@@ -216,7 +216,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;padd
           <td style="font-family:'DM Sans';font-size:10.5px;color:var(--text-mid)">Lost $458 dispute in Jan '26 → you refunded remaining $3,667 in Feb '26</td>
         </tr>
         <tr>
-          <td style="font-size:10.5px">mojadk@yahoo.com</td>
+          <td style="font-size:10.5px"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="aec3c1c4cfcac5eed7cfc6c1c180cdc1c3">[email&#160;protected]</a></td>
           <td><span class="pill pill-pending">partially_refunded</span></td>
           <td class="text-right">$3,917</td>
           <td class="text-right">—</td>
@@ -500,7 +500,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;padd
   </div>
 </div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 Chart.defaults.color='#7b7b96';Chart.defaults.borderColor='rgba(37,37,56,.5)';Chart.defaults.font.family="'DM Sans',sans-serif";Chart.defaults.font.size=11;
 
 // Composition pie
@@ -524,8 +524,4 @@ const mxP=Math.max(...sw.map(w=>w.p));const sh=document.getElementById('splititH
 sw.forEach(w=>{const bW=w.p/mxP*100;const color=w.l.match(/^(61|76)/)?'rgba(248,113,113,.6)':w.l.match(/^(91|12|15|18)/)?'rgba(248,113,113,.45)':'rgba(96,165,250,.5)';sh.innerHTML+=`<div class="histo-row"><div class="histo-label">${w.l}</div><div class="histo-bar-wrap"><div class="histo-bar" style="width:${Math.max(bW,8)}%;background:${color}">${w.c}</div></div><div class="histo-right">${w.p}% · $${(w.t/1000).toFixed(1)}K</div></div>`;});
 
 // Tab switching
-document.querySelectorAll('.tab').forEach(tab=>{tab.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));tab.classList.add('active');document.getElementById(tab.dataset.tab).classList.add('active');});});
-</script>
-</body>
-</html>
-
+document.querySelec
