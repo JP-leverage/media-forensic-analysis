@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whop Transaction Forensics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#060609;color:#eaeaf2;font-family:system-ui,-apple-system,sans-serif;line-height:1.6}
+.c{max-width:1400px;margin:0 auto;padding:20px 24px}
+.hdr{padding:28px 0 16px;margin-bottom:20px}
+.hdr h1{font-size:26px;font-weight:700}
+.hdr p{color:#7b7b96;font-size:13px;margin-top:6px;line-height:1.6}
+.meta{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap}
+.meta span{font-family:monospace;font-size:11px;color:#7b7b96;background:#0e0e15;padding:4px 10px;border-radius:6px;border:1px solid #252538}
+.meta .red{color:#f87171;border-color:rgba(248,113,113,.3)}
+.tabs{display:flex;gap:2px;margin-bottom:20px;background:#0e0e15;border-radius:8px;padding:3px;border:1px solid #252538;overflow-x:auto}
+.tab{padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:#7b7b96;white-space:nowrap;transition:all .15s}
+.tab:hover{color:#a5a5be}
+.tab.on{background:#1e1e2c;color:#eaeaf2;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.tp{display:none}.tp.on{display:block}
+.row{display:grid;gap:12px;margin-bottom:16px}
+.r2{grid-template-columns:1fr 1fr}.r3{grid-template-columns:1fr 1fr 1fr}.r4{grid-template-columns:repeat(4,1fr)}
+.kpi{background:#0e0e15;border:1px solid #252538;border-radius:8px;padding:14px 16px}
+.kpi .l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#7b7b96;margin-bottom:4px}
+.kpi .v{font-family:monospace;font-size:22px;font-weight:700}
+.kpi .s{font-size:11px;color:#7b7b96;margin-top:2px}
+.card{background:#0e0e15;border:1px solid #252538;border-radius:8px;padding:18px;margin-bottom:14px}
+.card h3{font-size:13px;font-weight:700;margin-bottom:12px}
+.ins{border-left:2px solid #fbbf24;background:rgba(251,191,36,.04);padding:12px 14px;border-radius:0 6px 6px 0;margin:10px 0;font-size:12.5px;line-height:1.7;color:#a5a5be}
+.ins.crit{border-color:#f87171;background:rgba(248,113,113,.04)}
+.ins.info{border-color:#60a5fa;background:rgba(96,165,250,.04)}
+.ins strong{color:#eaeaf2}
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+th{text-align:left;padding:7px 8px;color:#7b7b96;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;border-bottom:1px solid #252538}
+td{padding:7px 8px;border-bottom:1px solid rgba(37,37,56,.5);font-family:monospace;font-size:11px}
+.tr{text-align:right}.tred{color:#f87171}.tgrn{color:#34d399}.tamb{color:#fbbf24}.tblu{color:#60a5fa}.tpur{color:#c084fc}
+.cw{position:relative;height:260px}
+.badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:12px;text-transform:uppercase;margin-left:6px}
+.badge-r{background:rgba(248,113,113,.12);color:#f87171}
+.badge-g{background:rgba(52,211,153,.12);color:#34d399}
+.pill{display:inline-block;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:700}
+.pill-l{background:rgba(248,113,113,.12);color:#f87171}
+.pill-w{background:rgba(52,211,153,.12);color:#34d399}
+.pill-p{background:rgba(251,191,36,.12);color:#fbbf24}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.sbox{background:#161620;border-radius:6px;padding:12px 14px}
+.sbox .t{font-weight:700;font-size:12px;margin-bottom:6px}
+.sl{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(37,37,56,.4);font-size:11.5px}
+.sl:last-child{border:0}
+.sl .k{color:#7b7b96}.sl .val{font-family:monospace;font-weight:600}
+.hrow{display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11px}
+.hrow .hl{width:70px;font-family:monospace;color:#7b7b96;text-align:right;flex-shrink:0}
+.hrow .hw{flex:1;height:22px;background:#161620;border-radius:3px;overflow:hidden}
+.hrow .hb{height:100%;border-radius:3px;display:flex;align-items:center;padding-left:6px;font-family:monospace;font-size:9px;font-weight:700;color:#fff}
+.hrow .hr{width:100px;font-family:monospace;font-size:10px;color:#7b7b96;text-align:right;flex-shrink:0}
+@media(max-width:900px){.r2,.r3,.r4,.g3{grid-template-columns:1fr}}
+</style></head><body><div class="c">
+
+<div class="hdr">
+<h1>Whop Transaction Forensics - Corrected Exposure Report</h1>
+<p>This report analyzes a high-ticket online education business selling courses and mentorship programs at $500-$9,500+ per sale through Whop.com. Customers pay via credit card (Visa, Mastercard, Amex) or buy-now-pay-later installment plans (Splitit, Affirm, Klarna). Splitit holds funds on the customer's own credit card and charges monthly installments. Affirm and Klarna pay the merchant upfront. This distinction matters because Splitit charges are much easier for customers or their banks to reverse.</p>
+<div class="meta">
+<span>Aug 2024 - Mar 2026</span>
+<span>967 paid transactions</span>
+<span>$3.58M gross revenue</span>
+<span class="red">SALES BEING SHUT DOWN</span>
+</div></div>
+<div class="tabs"><div class="tab on" onclick="switchTab(0)">Overview</div><div class="tab" onclick="switchTab(1)">Timeline</div><div class="tab" onclick="switchTab(2)">Disputes</div><div class="tab" onclick="switchTab(3)">Exposure</div><div class="tab" onclick="switchTab(4)">Forward Risk</div></div>
+<div id="t0" class="tp on">
+<div class="row r4">
+<div class="kpi"><div class="l">Gross Revenue</div><div class="v" style="color:#60a5fa">$3.58M</div><div class="s">967 transactions</div></div>
+<div class="kpi"><div class="l">Money Gone</div><div class="v" style="color:#f87171">$438,723</div><div class="s">Refunds + dispute losses</div></div>
+<div class="kpi"><div class="l">Pending Risk</div><div class="v" style="color:#fbbf24">$12,542</div><div class="s">7 open disputes</div></div>
+<div class="kpi"><div class="l">Money Saved</div><div class="v" style="color:#34d399">$52,234</div><div class="s">Disputes won</div></div>
+</div>
+<div class="row r3">
+<div class="kpi"><div class="l">Refund Rate (Dollar)</div><div class="v" style="color:#f87171">10.6%</div><div class="s">93 refunds / $379K of $3.58M</div></div>
+<div class="kpi"><div class="l">Avg Transaction</div><div class="v">$3,702</div><div class="s">Range: $25 - $16,500</div></div>
+<div class="kpi"><div class="l">Avg Days to Refund</div><div class="v">52.3</div><div class="s">Median: 29 days</div></div>
+</div>
+<div class="ins crit"><strong>What 10.6% refund rate means:</strong> For every $100 collected, $10.60 comes back as refunds. Add dispute losses not in the refund column ($59K) and the real exposure is 12.6% of revenue. Industry benchmark for digital courses is 5-8%.</div>
+<div class="row r2">
+<div class="card"><h3>Monthly Revenue vs Refunds vs Disputes</h3><div class="cw"><canvas id="ch1"></canvas></div></div>
+<div class="card"><h3>Cumulative Refund Rate</h3><div class="cw"><canvas id="ch2"></canvas></div>
+<p style="font-size:11px;color:#7b7b96;margin-top:8px">Shows how the all-time refund rate evolved. Stable at ~7% through early 2025, climbed to 11.5% by Oct 2025 as Splitit scaled.</p></div>
+</div>
+<div class="card"><h3>Product Breakdown</h3>
+<div class="ins info"><strong>The business sells three products.</strong> The 8-Figure Masterclass is the flagship ($2,500-$9,500). Fast Cash Play is a lower-priced offer. Product C is supplementary.</div>
+<table><tr><th>Product</th><th class="tr">Sales</th><th class="tr">Revenue</th><th class="tr">Refunds</th><th class="tr">Rate</th><th class="tr">Disputes</th><th class="tr">Won $</th><th class="tr">Lost $</th></tr>
+<tr><td style="font-weight:600">Masterclass</td><td class="tr">734</td><td class="tr">$3,091,538</td><td class="tr">82 ($356,097)</td><td class="tr tred">11.5%</td><td class="tr">35</td><td class="tr tgrn">$51734</td><td class="tr tred">$52625</td></tr><tr><td style="font-weight:600">Fast Cash</td><td class="tr">145</td><td class="tr">$173,155</td><td class="tr">5 ($6,078)</td><td class="tr tgrn">3.5%</td><td class="tr">10</td><td class="tr tgrn">$500</td><td class="tr tred">$8689</td></tr><tr><td style="font-weight:600">Product C</td><td class="tr">74</td><td class="tr">$270,997</td><td class="tr">4 ($10,800)</td><td class="tr tgrn">4.0%</td><td class="tr">0</td><td class="tr tgrn">-</td><td class="tr tred">-</td></tr></table></div></div>
+<div id="t1" class="tp">
+<div class="ins info"><strong>What this shows:</strong> Monthly revenue and refunds broken down by how customers paid. Splitit entered the payment mix in May 2025 and immediately correlated with a jump in refund rates. Before Splitit, refunds were modest and card-based. After Splitit, red bars dominate.</div>
+<div class="row r2">
+<div class="card"><h3>Revenue by Payment Method</h3><div class="cw"><canvas id="ch3"></canvas></div></div>
+<div class="card"><h3>Refunds by Payment Method</h3><div class="cw"><canvas id="ch4"></canvas></div></div>
+</div>
+<div class="card"><h3>Refund Velocity - Days After Purchase</h3>
+<div class="ins info"><strong>Reading this:</strong> How quickly money comes back after purchase, split by method. "Payment shock" in weeks 1-2. "Installment cliff" at 61-90d is when BNPL customers bail after 2-3 monthly payments.</div>
+<div class="cw"><canvas id="ch5"></canvas></div></div>
+<div class="card"><h3>Dispute Scatter - Every Dispute by Days After Purchase</h3>
+<div class="ins info"><strong>Each dot = one dispute.</strong> X = days after purchase. Y = dollar amount. Green = won, Red = lost, Yellow = pending. Card disputes cluster across the full range. Splitit disputes tend to be smaller amounts but come later.</div>
+<div style="height:300px"><canvas id="ch6"></canvas></div>
+<div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:#7b7b96">
+<span style="color:#34d399">&#9679; Won</span>
+<span style="color:#f87171">&#9679; Lost</span>
+<span style="color:#fbbf24">&#9679; Pending</span>
+<span style="color:#60a5fa">&#9679; Card</span>
+<span style="color:#f87171">&#9679; Splitit</span>
+<span style="color:#c084fc">&#9679; Other</span>
+</div></div>
+</div>
+
+<div id="t2" class="tp">
+<div class="ins info"><strong>What are disputes?</strong> A dispute (chargeback) happens when a customer contacts their bank or card company (Visa, Mastercard, Amex) to reverse a charge instead of requesting a refund. The bank pulls the money back and you must provide evidence to defend. The card network makes a binding decision - if they side with the customer, money is gone permanently with no appeal. Digital products are hard to defend because "delivery" is hard to prove.</div>
+<div class="row r4">
+<div class="kpi"><div class="l">Total Disputed</div><div class="v" style="color:#f87171">$126,090</div><div class="s">45 disputes</div></div>
+<div class="kpi"><div class="l">Won</div><div class="v" style="color:#34d399">$52,234</div><div class="s">15 disputes</div></div>
+<div class="kpi"><div class="l">Lost</div><div class="v" style="color:#f87171">$61,314</div><div class="s">23 disputes</div></div>
+<div class="kpi"><div class="l">Pending</div><div class="v" style="color:#fbbf24">$12,542</div><div class="s">7 open</div></div>
+</div>
+
+<div class="card"><h3>Win Rate by Timing</h3>
+<div class="g3">
+<div class="sbox"><div class="t">0-30d after purchase</div><div style="font-size:20px;font-weight:700;font-family:monospace;color:#fbbf24">40% win</div><div style="font-size:11px;color:#7b7b96">12 disputes, $23,997</div><div style="font-size:11px;margin-top:4px"><span class="tgrn">Won $9,500</span> / <span class="tred">Lost $14,497</span></div></div><div class="sbox"><div class="t">31-90d after purchase</div><div style="font-size:20px;font-weight:700;font-family:monospace;color:#f87171">32% win</div><div style="font-size:11px;color:#7b7b96">17 disputes, $40,984</div><div style="font-size:11px;margin-top:4px"><span class="tgrn">Won $12,667</span> / <span class="tred">Lost $26,442</span></div></div><div class="sbox"><div class="t">90+d after purchase</div><div style="font-size:20px;font-weight:700;font-family:monospace;color:#34d399">60% win</div><div style="font-size:11px;color:#7b7b96">16 disputes, $61,108</div><div style="font-size:11px;margin-top:4px"><span class="tgrn">Won $30,067</span> / <span class="tred">Lost $20,375</span></div></div></div></div>
+
+<div class="card"><h3>Dispute Risk by Payment Method<span class="badge badge-r">Two Different Problems</span></h3>
+<div class="ins crit"><strong>Card disputes and Splitit disputes are fundamentally different risks.</strong> Card disputes go through Visa/Mastercard/Amex directly. Their decision is final - if they side with the customer, money is gone permanently, often with a $15-25 fee. You have no recourse. Card disputes average $3,466 each and you lose 59% of them. Splitit disputes are smaller ($1,042 avg) but cascade into larger refunds.</div>
+<div class="g3">
+<div class="sbox"><div class="t" style="color:#60a5fa">Card Disputes</div>
+<div style="font-size:20px;font-weight:700;font-family:monospace;color:#60a5fa">28 disputes</div>
+<div style="font-size:11px;color:#7b7b96;margin-bottom:8px">$97,048 total</div>
+<div class="sl"><span class="k">Won</span><span class="val tgrn">11 ($38,567)</span></div>
+<div class="sl"><span class="k">Lost</span><span class="val tred">16 ($53,481)</span></div>
+<div class="sl"><span class="k">Pending</span><span class="val tamb">1 ($5,000)</span></div>
+<div class="sl"><span class="k">Win rate</span><span class="val tred">41%</span></div>
+<div class="sl"><span class="k">Avg LOST</span><span class="val tred">$3,343</span></div>
+<div class="sl"><span class="k">Max LOST</span><span class="val tred">$9,500</span></div>
+</div>
+<div class="sbox"><div class="t" style="color:#f87171">Splitit Disputes</div>
+<div style="font-size:20px;font-weight:700;font-family:monospace;color:#f87171">13 disputes</div>
+<div style="font-size:11px;color:#7b7b96;margin-bottom:8px">$13,541 total</div>
+<div class="sl"><span class="k">Won</span><span class="val tgrn">3 ($4,167)</span></div>
+<div class="sl"><span class="k">Lost</span><span class="val tred">5 ($2,333)</span></div>
+<div class="sl"><span class="k">Pending</span><span class="val tamb">5 ($7,042)</span></div>
+<div class="sl"><span class="k">Cascade refunds</span><span class="val tred">$19,498</span></div>
+<div class="sl"><span class="k">Resolution lost</span><span class="val tred">$96,960</span></div>
+</div>
+<div class="sbox"><div class="t" style="color:#c084fc">Other Methods</div>
+<div style="font-size:20px;font-weight:700;font-family:monospace;color:#c084fc">4 disputes</div>
+<div style="font-size:11px;color:#7b7b96;margin-bottom:8px">$15,500 total</div>
+<div class="sl"><span class="k">Klarna</span><span class="val tred">$5K lost</span></div>
+<div class="sl"><span class="k">Affirm</span><span class="val tgrn">$9.5K won</span></div>
+<div class="sl"><span class="k">US Bank</span><span class="val tred">$500 lost</span></div>
+</div>
+</div></div>
+
+<div class="card"><h3>Card Disputes by Network</h3>
+<div class="ins info"><strong>Each card network has its own dispute process.</strong> When a customer disputes with their bank, it escalates to Visa/MC/Amex who make a binding decision. Visa is your worst performer (35% win, $28K lost). Amex has the highest per-loss ($5,666 avg). Mastercard is the only one you're winning majority (67%).</div>
+<table><tr><th>Network</th><th class="tr">Disputes</th><th class="tr">Total</th><th class="tr">Won</th><th class="tr">Lost</th><th class="tr">Win Rate</th><th class="tr">$ Lost</th><th class="tr">Avg Lost</th></tr>
+<tr style="background:rgba(248,113,113,.04)"><td style="font-weight:700">Visa</td><td class="tr">17</td><td class="tr">$40,600</td><td class="tr tgrn">6</td><td class="tr tred">11</td><td class="tr tred" style="font-weight:700">35%</td><td class="tr tred">$28,433</td><td class="tr">$2,585</td></tr>
+<tr><td style="font-weight:700">Mastercard</td><td class="tr">7</td><td class="tr">$29,951</td><td class="tr tgrn">4</td><td class="tr tred">2</td><td class="tr tgrn" style="font-weight:700">67%</td><td class="tr tred">$8,051</td><td class="tr">$4,026</td></tr>
+<tr style="background:rgba(248,113,113,.04)"><td style="font-weight:700">Amex</td><td class="tr">4</td><td class="tr">$26,497</td><td class="tr tgrn">1</td><td class="tr tred">3</td><td class="tr tred" style="font-weight:700">25%</td><td class="tr tred">$16,997</td><td class="tr tred">$5,666</td></tr>
+</table></div>
+
+<div class="card"><h3>Payment Method Full Comparison</h3>
+<div style="overflow-x:auto">
+<table><tr><th>Method</th><th class="tr">Sales</th><th class="tr">Revenue</th><th class="tr">Avg Pmt</th><th class="tr">Refunds</th><th class="tr">Refund $</th><th class="tr">Ref Rate</th><th class="tr">Avg Days</th><th class="tr">Disputes</th><th class="tr">Won $</th><th class="tr">Lost $</th></tr>
+<tr><td style="font-weight:600">card</td><td class="tr">716</td><td class="tr">$2,053,959</td><td class="tr">$2,869</td><td class="tr">44</td><td class="tr">$124,730</td><td class="tr tgrn">6.1%</td><td class="tr">28.8</td><td class="tr">28</td><td class="tr tgrn">$38,567</td><td class="tr tred">$53,481</td></tr><tr style="background:rgba(248,113,113,.04)"><td style="font-weight:600">splitit</td><td class="tr">152</td><td class="tr">$935,629</td><td class="tr">$6,155</td><td class="tr">42</td><td class="tr">$218,347</td><td class="tr tred">23.3%</td><td class="tr">78.6</td><td class="tr">13</td><td class="tr tgrn">$4,167</td><td class="tr tred">$2,333</td></tr><tr><td style="font-weight:600">affirm</td><td class="tr">34</td><td class="tr">$295,447</td><td class="tr">$8,690</td><td class="tr">3</td><td class="tr">$23,750</td><td class="tr tgrn">8.0%</td><td class="tr">30.7</td><td class="tr">1</td><td class="tr tgrn">$9,500</td><td class="tr tred">$0</td></tr><tr><td style="font-weight:600">klarna</td><td class="tr">21</td><td class="tr">$119,229</td><td class="tr">$5,678</td><td class="tr">1</td><td class="tr">$2,497</td><td class="tr tgrn">2.1%</td><td class="tr">68.0</td><td class="tr">1</td><td class="tr tgrn">$0</td><td class="tr tred">$5,000</td></tr><tr><td style="font-weight:600">link</td><td class="tr">19</td><td class="tr">$66,279</td><td class="tr">$3,488</td><td class="tr">1</td><td class="tr">$2,850</td><td class="tr tgrn">4.3%</td><td class="tr">81.0</td><td class="tr">0</td><td class="tr tgrn">$0</td><td class="tr tred">$0</td></tr><tr><td style="font-weight:600">us_bank_account</td><td class="tr">12</td><td class="tr">$83,750</td><td class="tr">$6,979</td><td class="tr">1</td><td class="tr">$7,125</td><td class="tr tamb">8.5%</td><td class="tr">56.0</td><td class="tr">2</td><td class="tr tgrn">$0</td><td class="tr tred">$500</td></tr><tr><td style="font-weight:600">afterpay_clearpay</td><td class="tr">4</td><td class="tr">$11,000</td><td class="tr">$2,750</td><td class="tr">0</td><td class="tr">$0</td><td class="tr tgrn">0.0%</td><td class="tr">-</td><td class="tr">0</td><td class="tr tgrn">$0</td><td class="tr tred">$0</td></tr><tr><td style="font-weight:600">cashapp</td><td class="tr">6</td><td class="tr">$10,750</td><td class="tr">$1,792</td><td class="tr">0</td><td class="tr">$0</td><td class="tr tgrn">0.0%</td><td class="tr">-</td><td class="tr">0</td><td class="tr tgrn">$0</td><td class="tr tred">$0</td></tr><tr><td style="font-weight:600">sezzle</td><td class="tr">2</td><td class="tr">$1,225</td><td class="tr">$612</td><td class="tr">1</td><td class="tr">$25</td><td class="tr tgrn">2.0%</td><td class="tr">-</td><td class="tr">0</td><td class="tr tgrn">$0</td><td class="tr tred">$0</td></tr><tr><td style="font-weight:600">crypto</td><td class="tr">1</td><td class="tr">$3,021</td><td class="tr">$3,021</td><td class="tr">0</td><td class="tr">$0</td><td class="tr tgrn">0.0%</td><td class="tr">-</td><td class="tr">0</td><td class="tr tgrn">$0</td><td class="tr tred">$0</td></tr></table></div></div><div class="card"><h3>All 45 Disputes</h3><div style="max-height:400px;overflow-y:auto"><table><tr><th>ID</th><th class="tr">Amount</th><th>Reason</th><th>Method</th><th>Product</th><th class="tr">Days</th><th>Status</th></tr><tr><td>QZ</td><td class="tr">$1,250</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Product not received</td><td>card</td><td>MC</td><td class="tr">22d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>EA</td><td class="tr">$1,900</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Product unacceptable</td><td>card</td><td>MC</td><td class="tr">109d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>CY</td><td class="tr">$9,500</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Credit not processed</td><td>card</td><td>MC</td><td class="tr">121d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>MD</td><td class="tr">$2,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Credit not processed</td><td>card</td><td>MC</td><td class="tr">7d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>ZS</td><td class="tr">$2,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Fraudulent</td><td>card</td><td>MC</td><td class="tr">12d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>AM</td><td class="tr">$5,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Fraudulent</td><td>card</td><td>MC</td><td class="tr">36d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>JP</td><td class="tr">$2,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Product not received</td><td>card</td><td>MC</td><td class="tr">7d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>KM</td><td class="tr">$792</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">F29</td><td>splitit</td><td>MC</td><td class="tr">3d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>RW</td><td class="tr">$500</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Fraudulent</td><td>card</td><td>FCP</td><td class="tr">34d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>RW</td><td class="tr">$500</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Fraudulent</td><td>card</td><td>FCP</td><td class="tr">4d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>LN</td><td class="tr">$933</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Product unacceptable</td><td>card</td><td>FCP</td><td class="tr">40d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>JH</td><td class="tr">$500</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Credit not processed</td><td>card</td><td>FCP</td><td class="tr">47d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>JV</td><td class="tr">$2,497</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Product unacceptable</td><td>card</td><td>FCP</td><td class="tr">11d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>RA</td><td class="tr">$3,667</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Credit not processed</td><td>card</td><td>MC</td><td class="tr">90d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>JV</td><td class="tr">$2,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Fraudulent</td><td>card</td><td>MC</td><td class="tr">8d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>JV</td><td class="tr">$2,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Fraudulent</td><td>card</td><td>MC</td><td class="tr">68d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>JV</td><td class="tr">$2,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Fraudulent</td><td>card</td><td>MC</td><td class="tr">39d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>JG</td><td class="tr">$1,250</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Subscription canceled</td><td>card</td><td>MC</td><td class="tr">40d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>HH</td><td class="tr">$500</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Credit not processed</td><td>card</td><td>FCP</td><td class="tr">23d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>MM</td><td class="tr">$5,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Fraudulent</td><td>klarna</td><td>MC</td><td class="tr">33d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>J</td><td class="tr">$5,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Credit not processed</td><td>card</td><td>MC</td><td class="tr">162d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>DH</td><td class="tr">$5,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Product not received</td><td>card</td><td>MC</td><td class="tr">56d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>TS</td><td class="tr">$9,500</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Unrecognized</td><td>affirm</td><td>MC</td><td class="tr">254d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>BC</td><td class="tr">$5,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Product unacceptable</td><td>card</td><td>MC</td><td class="tr">24d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>CN</td><td class="tr">$9,500</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Product unacceptable</td><td>card</td><td>MC</td><td class="tr">193d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>CM</td><td class="tr">$5,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">No cardholder authoris</td><td>card</td><td>MC</td><td class="tr">24d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>SJ</td><td class="tr">$208</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">11.2: Authorization</td><td>splitit</td><td>FCP</td><td class="tr">48d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>TW</td><td class="tr">$5,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Credit not processed</td><td>card</td><td>MC</td><td class="tr">75d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>SK</td><td class="tr">$417</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Non+receipt+of+merchan</td><td>splitit</td><td>MC</td><td class="tr">111d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>EM</td><td class="tr">$3,333</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">4808: Required Authori</td><td>splitit</td><td>MC</td><td class="tr">104d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>GG</td><td class="tr">$3,051</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Fraudulent</td><td>card</td><td>FCP</td><td class="tr">55d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>AJ</td><td class="tr">$458</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">C31</td><td>splitit</td><td>MC</td><td class="tr">84d</td><td><span class="pill pill-p">review</span></td></tr><tr><td>U</td><td class="tr">$458</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">13.7</td><td>splitit</td><td>MC</td><td class="tr">18d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>GO</td><td class="tr">$5,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Canceled recurring</td><td>card</td><td>MC</td><td class="tr">40d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>CO</td><td class="tr">$458</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">13.7</td><td>splitit</td><td>MC</td><td class="tr">119d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>CO</td><td class="tr">$9,500</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Credit not processed</td><td>card</td><td>MC</td><td class="tr">346d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>SF</td><td class="tr">$500</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Debit not authorized</td><td>us_bank_account</td><td>FCP</td><td class="tr">126d</td><td><span class="pill pill-p">warning_review</span></td></tr><tr><td>VG</td><td class="tr">$708</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">13.1</td><td>splitit</td><td>MC</td><td class="tr">74d</td><td><span class="pill pill-p">review</span></td></tr><tr><td>VG</td><td class="tr">$708</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">13.1</td><td>splitit</td><td>MC</td><td class="tr">74d</td><td><span class="pill pill-p">review</span></td></tr><tr><td>JV</td><td class="tr">$417</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">13.7</td><td>splitit</td><td>MC</td><td class="tr">214d</td><td><span class="pill pill-p">review</span></td></tr><tr><td>JV</td><td class="tr">$417</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">13.7</td><td>splitit</td><td>MC</td><td class="tr">214d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>JV</td><td class="tr">$417</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">13.7: Consumer Dispute</td><td>splitit</td><td>MC</td><td class="tr">217d</td><td><span class="pill pill-w">won</span></td></tr><tr><td>SF</td><td class="tr">$500</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Debit not authorized</td><td>us_bank_account</td><td>FCP</td><td class="tr">176d</td><td><span class="pill pill-l">lost</span></td></tr><tr><td>R</td><td class="tr">$5,000</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">Product unacceptable</td><td>card</td><td>MC</td><td class="tr">102d</td><td><span class="pill pill-p">pending</span></td></tr><tr><td>CW</td><td class="tr">$4,750</td><td style="font-family:system-ui;font-size:10px;color:#7b7b96">10.4: Fraudulent Trans</td><td>splitit</td><td>MC</td><td class="tr">264d</td><td><span class="pill pill-p">review</span></td></tr></table></div></div></div>
+<div id="t3" class="tp">
+<div class="ins info"><strong>Why this matters:</strong> Whop records refunds and disputes in overlapping ways. Some refunds were caused by disputes. To avoid double-counting, every Payment ID was checked against both tables and separated into mutually exclusive buckets.</div>
+<div class="card"><h3>Exposure Waterfall - No Double Counting</h3>
+<table><tr><th>Category</th><th>What It Is</th><th class="tr">Count</th><th class="tr">Amount</th></tr>
+<tr><td style="font-weight:600"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#60a5fa;margin-right:6px"></span>Pure Voluntary</td><td style="font-size:10px;color:#7b7b96">You chose to refund. No dispute.</td><td class="tr">68</td><td class="tr tblu">$255,617</td></tr>
+<tr><td style="font-weight:600"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c084fc;margin-right:6px"></span>Resolution Lost</td><td style="font-size:10px;color:#7b7b96">Splitit hold releases / bank reversals. Not in disputes table.</td><td class="tr">19</td><td class="tr tpur">$96,960</td></tr>
+<tr><td style="font-weight:600"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f87171;margin-right:6px"></span>Dispute-Forced</td><td style="font-size:10px;color:#7b7b96">Lost dispute triggered full refund of remaining balance.</td><td class="tr">4</td><td class="tr tred">$19,498</td></tr>
+<tr><td style="font-weight:600"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#fbbf24;margin-right:6px"></span>Voluntary + Won</td><td style="font-size:10px;color:#7b7b96">Refunded AND they disputed, but you won.</td><td class="tr">2</td><td class="tr tamb">$7,250</td></tr>
+<tr style="border-top:2px solid #252538;font-weight:700"><td colspan="2">= Refund Column Total</td><td class="tr">93</td><td class="tr">$379,325</td></tr>
+</table>
+<div style="height:12px"></div>
+<table>
+<tr><td style="font-weight:600"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f87171;margin-right:6px"></span>Pure Dispute Losses</td><td style="font-size:10px;color:#7b7b96">Chargebacks with $0 in refund column.</td><td class="tr">19</td><td class="tr tred">$59,398</td></tr>
+<tr><td style="font-weight:600"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#fbbf24;margin-right:6px"></span>Pending Disputes</td><td style="font-size:10px;color:#7b7b96">Open cases, could go either way.</td><td class="tr">7</td><td class="tr tamb">$12,542</td></tr>
+<tr><td style="font-weight:600"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399;margin-right:6px"></span>Disputes Won</td><td style="font-size:10px;color:#7b7b96">You kept the money.</td><td class="tr">15</td><td class="tr tgrn">$52,234</td></tr>
+</table></div>
+<div class="g3">
+<div style="background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:14px"><div style="font-size:10px;color:#7b7b96;font-weight:600">Money Gone</div><div style="font-size:22px;font-weight:700;font-family:monospace;color:#f87171">$438,723</div></div>
+<div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:14px"><div style="font-size:10px;color:#7b7b96;font-weight:600">At Risk</div><div style="font-size:22px;font-weight:700;font-family:monospace;color:#fbbf24">$12,542</div></div>
+<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:14px"><div style="font-size:10px;color:#7b7b96;font-weight:600">Saved</div><div style="font-size:22px;font-weight:700;font-family:monospace;color:#34d399">$52,234</div></div>
+</div>
+<div class="card" style="margin-top:14px"><h3>Exposure by Composition</h3><div class="cw"><canvas id="ch7"></canvas></div></div>
+</div>
+
+<div id="t4" class="tp">
+<div class="ins crit"><strong>Sales are shut down. No new revenue.</strong> Every future refund/dispute is pure cash outflow. Whop balance: -$9,872. What matters: how much of the existing customer base is still in the refund/chargeback window?</div>
+<div class="row r4">
+<div class="kpi"><div class="l">Pending Disputes</div><div class="v" style="color:#fbbf24">$12,542</div><div class="s">7 cases</div></div>
+<div class="kpi"><div class="l">Splitit at Risk</div><div class="v" style="color:#f87171">105 customers</div><div class="s">$640,207 in payments</div></div>
+<div class="kpi"><div class="l">Splitit Projected</div><div class="v" style="color:#f87171">$149,168</div><div class="s">At 23.3% rate</div></div>
+<div class="kpi"><div class="l">Recent Customers</div><div class="v" style="color:#fbbf24">196</div><div class="s">Since Sep 25, $753,303</div></div>
+</div>
+<div class="card"><h3>Forward Exposure - No New Sales</h3>
+<table><tr><th>Risk</th><th>Reasoning</th><th class="tr">Pool</th><th class="tr">Rate</th><th class="tr">Projected</th></tr>
+<tr><td style="font-weight:600">Pending disputes</td><td style="font-size:10px;color:#7b7b96">7 open, 60.5% loss rate</td><td class="tr">$12,542</td><td class="tr">60.5%</td><td class="tr tamb">$7,588</td></tr>
+<tr><td style="font-weight:600">Splitit active</td><td style="font-size:10px;color:#7b7b96">105 customers. Some past peak.</td><td class="tr">$640,207</td><td class="tr">15-23%</td><td class="tr tred">$96-149K</td></tr>
+<tr><td style="font-weight:600">Card/other recent</td><td style="font-size:10px;color:#7b7b96">Within 180-day chargeback window</td><td class="tr">$753,303</td><td class="tr">3-6%</td><td class="tr tamb">$23-45K</td></tr>
+<tr><td style="font-weight:600">Cascade risk</td><td style="font-size:10px;color:#7b7b96">Splitit disputes trigger 11x refunds</td><td class="tr">-</td><td class="tr">-</td><td class="tr tred">$20-50K</td></tr>
+<tr style="background:#161620;font-weight:700"><td colspan="3">Total Forward Exposure</td><td></td><td class="tr tred" style="font-size:14px">$147-292K</td></tr>
+</table></div>
+<div class="card"><h3>Prioritized Actions</h3>
+<table><tr><th>#</th><th>Action</th><th class="tr">Impact</th><th>Priority</th></tr>
+<tr><td>1</td><td style="font-family:system-ui"><strong>Cancel remaining Splitit plans.</strong> 105 active = $640,207 volume.</td><td class="tr tgrn" style="font-family:monospace">$96-149K</td><td><span class="pill pill-l">Urgent</span></td></tr>
+<tr><td>2</td><td style="font-family:system-ui"><strong>Fight 7 pending disputes with max evidence.</strong> $12.5K at stake. One $5K needs response NOW.</td><td class="tr tgrn" style="font-family:monospace">$5-8K</td><td><span class="pill pill-l">Urgent</span></td></tr>
+<tr><td>3</td><td style="font-family:system-ui"><strong>Stop cascade refunds.</strong> Losing $458 then refunding $5K costs 11x. Fight each installment separately.</td><td class="tr tgrn" style="font-family:monospace">$20-50K</td><td><span class="pill pill-l">Urgent</span></td></tr>
+<tr><td>4</td><td style="font-family:system-ui"><strong>Set aside $147K cash reserves.</strong> Balance is -$9.9K with projected losses ahead.</td><td class="tr tamb" style="font-family:monospace">Planning</td><td><span class="pill pill-p">High</span></td></tr>
+<tr><td>5</td><td style="font-family:system-ui"><strong>Proactive outreach to Splitit customers.</strong> Offer reduced settlements - 70% beats 100% refund.</td><td class="tr tgrn" style="font-family:monospace">$30-50K</td><td><span class="pill pill-p">High</span></td></tr>
+</table></div>
+</div>
+
+</div>
+<script>
+var MD = [{"month": "2024-08", "revenue": 82500, "refunds": 0, "sales": 24, "ref_count": 0, "cum_rate": 0.0, "rate": 0.0, "card_rev": 80000, "split_rev": 0, "other_rev": 2500, "card_ref": 0, "split_ref": 0, "other_ref": 0, "disputes": 0, "disp_amt": 0}, {"month": "2024-09", "revenue": 77500, "refunds": 10000, "sales": 27, "ref_count": 3, "cum_rate": 6.2, "rate": 12.9, "card_rev": 72500, "split_rev": 0, "other_rev": 5000, "card_ref": 10000, "split_ref": 0, "other_ref": 0, "disputes": 0, "disp_amt": 0}, {"month": "2024-10", "revenue": 185274, "refunds": 12050, "sales": 38, "ref_count": 3, "cum_rate": 6.4, "rate": 6.5, "card_rev": 99052, "split_rev": 0, "other_rev": 86222, "card_ref": 12050, "split_ref": 0, "other_ref": 0, "disputes": 0, "disp_amt": 0}, {"month": "2024-11", "revenue": 143533, "refunds": 9500, "sales": 37, "ref_count": 1, "cum_rate": 6.5, "rate": 6.6, "card_rev": 100208, "split_rev": 0, "other_rev": 43325, "card_ref": 9500, "split_ref": 0, "other_ref": 0, "disputes": 0, "disp_amt": 0}, {"month": "2024-12", "revenue": 265084, "refunds": 20809, "sales": 56, "ref_count": 5, "cum_rate": 6.9, "rate": 7.8, "card_rev": 132209, "split_rev": 0, "other_rev": 132875, "card_ref": 13684, "split_ref": 0, "other_ref": 7125, "disputes": 0, "disp_amt": 0}, {"month": "2025-01", "revenue": 281375, "refunds": 23442, "sales": 60, "ref_count": 5, "cum_rate": 7.3, "rate": 8.3, "card_rev": 141250, "split_rev": 0, "other_rev": 140125, "card_ref": 6817, "split_ref": 0, "other_ref": 16625, "disputes": 2, "disp_amt": 3150}, {"month": "2025-02", "revenue": 275171, "refunds": 33388, "sales": 73, "ref_count": 10, "cum_rate": 8.3, "rate": 12.1, "card_rev": 258171, "split_rev": 0, "other_rev": 17000, "card_ref": 26263, "split_ref": 0, "other_ref": 7125, "disputes": 0, "disp_amt": 0}, {"month": "2025-03", "revenue": 191482, "refunds": 7167, "sales": 59, "ref_count": 2, "cum_rate": 7.7, "rate": 3.7, "card_rev": 181982, "split_rev": 0, "other_rev": 9500, "card_ref": 7167, "split_ref": 0, "other_ref": 0, "disputes": 1, "disp_amt": 9500}, {"month": "2025-04", "revenue": 212266, "refunds": 5747, "sales": 70, "ref_count": 3, "cum_rate": 7.1, "rate": 2.7, "card_rev": 180890, "split_rev": 0, "other_rev": 31376, "card_ref": 3250, "split_ref": 0, "other_ref": 2497, "disputes": 2, "disp_amt": 4000}, {"month": "2025-05", "revenue": 162106, "refunds": 14983, "sales": 65, "ref_count": 4, "cum_rate": 7.3, "rate": 9.2, "card_rev": 119087, "split_rev": 40497, "other_rev": 2522, "card_ref": 6250, "split_ref": 8708, "other_ref": 25, "disputes": 3, "disp_amt": 7792}, {"month": "2025-06", "revenue": 188115, "refunds": 33075, "sales": 59, "ref_count": 5, "cum_rate": 8.2, "rate": 17.6, "card_rev": 60130, "split_rev": 90494, "other_rev": 37491, "card_ref": 1250, "split_ref": 31825, "other_ref": 0, "disputes": 4, "disp_amt": 2433}, {"month": "2025-07", "revenue": 244069, "refunds": 42750, "sales": 77, "ref_count": 10, "cum_rate": 9.2, "rate": 17.5, "card_rev": 89304, "split_rev": 123997, "other_rev": 30768, "card_ref": 6250, "split_ref": 36500, "other_ref": 0, "disputes": 1, "disp_amt": 2497}, {"month": "2025-08", "revenue": 345118, "refunds": 63283, "sales": 89, "ref_count": 16, "cum_rate": 10.4, "rate": 18.3, "card_rev": 104371, "split_rev": 214750, "other_rev": 25997, "card_ref": 5500, "split_ref": 54933, "other_ref": 2850, "disputes": 6, "disp_amt": 11417}, {"month": "2025-09", "revenue": 243671, "refunds": 41597, "sales": 63, "ref_count": 12, "cum_rate": 11.0, "rate": 17.1, "card_rev": 99877, "split_rev": 132544, "other_rev": 11250, "card_ref": 4250, "split_ref": 37347, "other_ref": 0, "disputes": 4, "disp_amt": 24500}, {"month": "2025-10", "revenue": 268354, "refunds": 45567, "sales": 64, "ref_count": 10, "cum_rate": 11.5, "rate": 17.0, "card_rev": 96457, "split_rev": 171397, "other_rev": 500, "card_ref": 12000, "split_ref": 33567, "other_ref": 0, "disputes": 3, "disp_amt": 19500}, {"month": "2025-11", "revenue": 198921, "refunds": 0, "sales": 46, "ref_count": 0, "cum_rate": 10.8, "rate": 0.0, "card_rev": 105471, "split_rev": 84950, "other_rev": 8500, "card_ref": 0, "split_ref": 0, "other_ref": 0, "disputes": 3, "disp_amt": 5625}, {"month": "2025-12", "revenue": 99500, "refunds": 5542, "sales": 26, "ref_count": 2, "cum_rate": 10.6, "rate": 5.6, "card_rev": 55250, "split_rev": 43500, "other_rev": 750, "card_ref": 500, "split_ref": 5042, "other_ref": 0, "disputes": 1, "disp_amt": 3333}, {"month": "2026-01", "revenue": 58750, "refunds": 10425, "sales": 14, "ref_count": 2, "cum_rate": 10.8, "rate": 17.7, "card_rev": 34000, "split_rev": 24750, "other_rev": 0, "card_ref": 0, "split_ref": 10425, "other_ref": 0, "disputes": 5, "disp_amt": 9426}, {"month": "2026-02", "revenue": 39500, "refunds": 0, "sales": 14, "ref_count": 0, "cum_rate": 10.6, "rate": 0.0, "card_rev": 30750, "split_rev": 8750, "other_rev": 0, "card_ref": 0, "split_ref": 0, "other_ref": 0, "disputes": 8, "disp_amt": 13167}, {"month": "2026-03", "revenue": 18000, "refunds": 0, "sales": 6, "ref_count": 0, "cum_rate": 10.6, "rate": 0.0, "card_rev": 13000, "split_rev": 0, "other_rev": 5000, "card_ref": 0, "split_ref": 0, "other_ref": 0, "disputes": 2, "disp_amt": 9750}];
+var VD = [{"window": "0-3d", "count": 9, "total": 21559, "card": 14434, "splitit": 7125, "other": 0}, {"window": "4-7d", "count": 8, "total": 33238, "card": 6088, "splitit": 17650, "other": 9500}, {"window": "8-14d", "count": 12, "total": 37175, "card": 14375, "splitit": 22800, "other": 0}, {"window": "15-30d", "count": 11, "total": 55875, "card": 24750, "splitit": 24000, "other": 7125}, {"window": "31-60d", "count": 11, "total": 47325, "card": 10934, "splitit": 22142, "other": 14250}, {"window": "61-90d", "count": 18, "total": 74164, "card": 15750, "splitit": 53067, "other": 5347}, {"window": "90+d", "count": 17, "total": 82214, "card": 10650, "splitit": 71564, "other": 0}];
+var DD = [{"id": 1, "customer": "QZ", "amount": 1250.0, "status": "lost", "reason": "Product not received", "method": "card", "product": "MC", "disputed": "2025-01-25", "paid": "2025-01-02", "days": 22, "pay_amt": 1250.0}, {"id": 2, "customer": "EA", "amount": 1900.0, "status": "won", "reason": "Product unacceptable", "method": "card", "product": "MC", "disputed": "2025-01-29", "paid": "2024-10-11", "days": 109, "pay_amt": 1900.0}, {"id": 3, "customer": "CY", "amount": 9500.0, "status": "won", "reason": "Credit not processed", "method": "card", "product": "MC", "disputed": "2025-03-26", "paid": "2024-11-24", "days": 121, "pay_amt": 9500.0}, {"id": 4, "customer": "MD", "amount": 2000.0, "status": "lost", "reason": "Credit not processed", "method": "card", "product": "MC", "disputed": "2025-04-13", "paid": "2025-04-05", "days": 7, "pay_amt": 2000.0}, {"id": 5, "customer": "ZS", "amount": 2000.0, "status": "won", "reason": "Fraudulent", "method": "card", "product": "MC", "disputed": "2025-04-20", "paid": "2025-04-07", "days": 12, "pay_amt": 2000.0}, {"id": 6, "customer": "AM", "amount": 5000.0, "status": "won", "reason": "Fraudulent", "method": "card", "product": "MC", "disputed": "2025-05-01", "paid": "2025-03-26", "days": 36, "pay_amt": 5000.0}, {"id": 7, "customer": "JP", "amount": 2000.0, "status": "lost", "reason": "Product not received", "method": "card", "product": "MC", "disputed": "2025-05-25", "paid": "2025-05-18", "days": 7, "pay_amt": 2000.0}, {"id": 8, "customer": "KM", "amount": 791.67, "status": "lost", "reason": "F29", "method": "splitit", "product": "MC", "disputed": "2025-05-30", "paid": "2025-05-27", "days": 3, "pay_amt": 9500.0}, {"id": 9, "customer": "RW", "amount": 500.0, "status": "lost", "reason": "Fraudulent", "method": "card", "product": "FCP", "disputed": "2025-06-04", "paid": "2025-04-30", "days": 34, "pay_amt": 500.0}, {"id": 10, "customer": "RW", "amount": 500.0, "status": "lost", "reason": "Fraudulent", "method": "card", "product": "FCP", "disputed": "2025-06-04", "paid": "2025-05-30", "days": 4, "pay_amt": 500.0}, {"id": 11, "customer": "LN", "amount": 933.0, "status": "lost", "reason": "Product unacceptable", "method": "card", "product": "FCP", "disputed": "2025-06-11", "paid": "2025-05-01", "days": 40, "pay_amt": 933.0}, {"id": 12, "customer": "JH", "amount": 500.0, "status": "lost", "reason": "Credit not processed", "method": "card", "product": "FCP", "disputed": "2025-06-26", "paid": "2025-05-09", "days": 47, "pay_amt": 500.0}, {"id": 13, "customer": "JV", "amount": 2497.0, "status": "lost", "reason": "Product unacceptable", "method": "card", "product": "FCP", "disputed": "2025-07-18", "paid": "2025-07-06", "days": 11, "pay_amt": 2497.0}, {"id": 14, "customer": "RA", "amount": 3667.0, "status": "won", "reason": "Credit not processed", "method": "card", "product": "MC", "disputed": "2025-08-01", "paid": "2025-05-03", "days": 90, "pay_amt": 3667.0}, {"id": 15, "customer": "JV", "amount": 2000.0, "status": "won", "reason": "Fraudulent", "method": "card", "product": "MC", "disputed": "2025-08-17", "paid": "2025-08-08", "days": 8, "pay_amt": 2000.0}, {"id": 16, "customer": "JV", "amount": 2000.0, "status": "won", "reason": "Fraudulent", "method": "card", "product": "MC", "disputed": "2025-08-17", "paid": "2025-06-09", "days": 68, "pay_amt": 2000.0}, {"id": 17, "customer": "JV", "amount": 2000.0, "status": "won", "reason": "Fraudulent", "method": "card", "product": "MC", "disputed": "2025-08-18", "paid": "2025-07-09", "days": 39, "pay_amt": 2000.0}, {"id": 18, "customer": "JG", "amount": 1250.0, "status": "lost", "reason": "Subscription canceled", "method": "card", "product": "MC", "disputed": "2025-08-21", "paid": "2025-07-12", "days": 40, "pay_amt": 1250.0}, {"id": 19, "customer": "HH", "amount": 500.0, "status": "won", "reason": "Credit not processed", "method": "card", "product": "FCP", "disputed": "2025-08-30", "paid": "2025-08-06", "days": 23, "pay_amt": 500.0}, {"id": 20, "customer": "MM", "amount": 5000.0, "status": "lost", "reason": "Fraudulent", "method": "klarna", "product": "MC", "disputed": "2025-09-03", "paid": "2025-08-01", "days": 33, "pay_amt": 5000.0}, {"id": 21, "customer": "J", "amount": 5000.0, "status": "won", "reason": "Credit not processed", "method": "card", "product": "MC", "disputed": "2025-09-10", "paid": "2025-03-31", "days": 162, "pay_amt": 5000.0}, {"id": 22, "customer": "DH", "amount": 5000.0, "status": "lost", "reason": "Product not received", "method": "card", "product": "MC", "disputed": "2025-09-13", "paid": "2025-07-18", "days": 56, "pay_amt": 5000.0}, {"id": 23, "customer": "TS", "amount": 9500.0, "status": "won", "reason": "Unrecognized", "method": "affirm", "product": "MC", "disputed": "2025-09-27", "paid": "2025-01-16", "days": 254, "pay_amt": 9500.0}, {"id": 24, "customer": "BC", "amount": 5000.0, "status": "won", "reason": "Product unacceptable", "method": "card", "product": "MC", "disputed": "2025-10-01", "paid": "2025-09-06", "days": 24, "pay_amt": 5000.0}, {"id": 25, "customer": "CN", "amount": 9500.0, "status": "lost", "reason": "Product unacceptable", "method": "card", "product": "MC", "disputed": "2025-10-22", "paid": "2025-04-11", "days": 193, "pay_amt": 9500.0}, {"id": 26, "customer": "CM", "amount": 5000.0, "status": "lost", "reason": "No cardholder authoris", "method": "card", "product": "MC", "disputed": "2025-10-29", "paid": "2025-10-04", "days": 24, "pay_amt": 5000.0}, {"id": 27, "customer": "SJ", "amount": 208.08, "status": "lost", "reason": "11.2: Authorization", "method": "splitit", "product": "FCP", "disputed": "2025-11-09", "paid": "2025-09-21", "days": 48, "pay_amt": 2497.0}, {"id": 28, "customer": "TW", "amount": 5000.0, "status": "lost", "reason": "Credit not processed", "method": "card", "product": "MC", "disputed": "2025-11-20", "paid": "2025-09-05", "days": 75, "pay_amt": 5000.0}, {"id": 29, "customer": "SK", "amount": 416.67, "status": "won", "reason": "Non+receipt+of+merchan", "method": "splitit", "product": "MC", "disputed": "2025-11-24", "paid": "2025-08-05", "days": 111, "pay_amt": 5000.0}, {"id": 30, "customer": "EM", "amount": 3333.32, "status": "won", "reason": "4808: Required Authori", "method": "splitit", "product": "MC", "disputed": "2025-12-24", "paid": "2025-09-11", "days": 104, "pay_amt": 5000.0}, {"id": 31, "customer": "GG", "amount": 3051.25, "status": "lost", "reason": "Fraudulent", "method": "card", "product": "FCP", "disputed": "2026-01-06", "paid": "2025-11-12", "days": 55, "pay_amt": 2971.43}, {"id": 32, "customer": "AJ", "amount": 458.33, "status": "under_review", "reason": "C31", "method": "splitit", "product": "MC", "disputed": "2026-01-06", "paid": "2025-10-13", "days": 84, "pay_amt": 5500.0}, {"id": 33, "customer": "U", "amount": 458.33, "status": "lost", "reason": "13.7", "method": "splitit", "product": "MC", "disputed": "2026-01-07", "paid": "2025-12-19", "days": 18, "pay_amt": 5500.0}, {"id": 34, "customer": "GO", "amount": 5000.0, "status": "lost", "reason": "Canceled recurring", "method": "card", "product": "MC", "disputed": "2026-01-07", "paid": "2025-11-28", "days": 40, "pay_amt": 5000.0}, {"id": 35, "customer": "CO", "amount": 458.33, "status": "lost", "reason": "13.7", "method": "splitit", "product": "MC", "disputed": "2026-01-29", "paid": "2025-10-01", "days": 119, "pay_amt": 5500.0}, {"id": 36, "customer": "CO", "amount": 9500.0, "status": "lost", "reason": "Credit not processed", "method": "card", "product": "MC", "disputed": "2026-02-03", "paid": "2025-02-21", "days": 346, "pay_amt": 9500.0}, {"id": 37, "customer": "SF", "amount": 500.0, "status": "warning_under_review", "reason": "Debit not authorized", "method": "us_bank_account", "product": "FCP", "disputed": "2026-02-13", "paid": "2025-10-09", "days": 126, "pay_amt": 500.0}, {"id": 38, "customer": "VG", "amount": 708.33, "status": "under_review", "reason": "13.1", "method": "splitit", "product": "MC", "disputed": "2026-02-14", "paid": "2025-12-01", "days": 74, "pay_amt": 8500.0}, {"id": 39, "customer": "VG", "amount": 708.33, "status": "under_review", "reason": "13.1", "method": "splitit", "product": "MC", "disputed": "2026-02-14", "paid": "2025-12-01", "days": 74, "pay_amt": 8500.0}, {"id": 40, "customer": "JV", "amount": 416.67, "status": "under_review", "reason": "13.7", "method": "splitit", "product": "MC", "disputed": "2026-02-17", "paid": "2025-07-18", "days": 214, "pay_amt": 5000.0}, {"id": 41, "customer": "JV", "amount": 416.67, "status": "lost", "reason": "13.7", "method": "splitit", "product": "MC", "disputed": "2026-02-17", "paid": "2025-07-18", "days": 214, "pay_amt": 5000.0}, {"id": 42, "customer": "JV", "amount": 416.67, "status": "won", "reason": "13.7: Consumer Dispute", "method": "splitit", "product": "MC", "disputed": "2026-02-20", "paid": "2025-07-18", "days": 217, "pay_amt": 5000.0}, {"id": 43, "customer": "SF", "amount": 500.0, "status": "lost", "reason": "Debit not authorized", "method": "us_bank_account", "product": "FCP", "disputed": "2026-02-27", "paid": "2025-09-03", "days": 176, "pay_amt": 500.0}, {"id": 44, "customer": "R", "amount": 5000.0, "status": "needs_response", "reason": "Product unacceptable", "method": "card", "product": "MC", "disputed": "2026-03-17", "paid": "2025-12-04", "days": 102, "pay_amt": 5000.0}, {"id": 45, "customer": "CW", "amount": 4749.98, "status": "under_review", "reason": "10.4: Fraudulent Trans", "method": "splitit", "product": "MC", "disputed": "2026-03-18", "paid": "2025-06-27", "days": 264, "pay_amt": 9500.0}];
+
+Chart.defaults.color = '#7b7b96';
+Chart.defaults.borderColor = 'rgba(37,37,56,.5)';
+Chart.defaults.font.family = 'system-ui';
+Chart.defaults.font.size = 10;
+
+var labels = MD.map(function(m){ return m.month.replace('20', "'"); });
+
+function switchTab(n) {
+  document.querySelectorAll('.tab').forEach(function(t,i){ t.className = i===n ? 'tab on' : 'tab'; });
+  document.querySelectorAll('.tp').forEach(function(p,i){ p.className = i===n ? 'tp on' : 'tp'; });
+}
+
+// Ch1: Revenue vs Refunds vs Disputes
+new Chart(document.getElementById('ch1'), {
+  type: 'bar',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'Revenue', data: MD.map(function(m){return m.revenue}), backgroundColor: 'rgba(96,165,250,.5)', borderRadius: 2 },
+      { label: 'Refunds', data: MD.map(function(m){return m.refunds}), backgroundColor: 'rgba(248,113,113,.7)', borderRadius: 2 },
+      { label: 'Disputes', data: MD.map(function(m){return m.disp_amt}), backgroundColor: 'rgba(251,191,36,.6)', borderRadius: 2 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top',labels:{boxWidth:10,padding:10}}}, scales:{y:{ticks:{callback:function(v){return '$'+Math.round(v/1000)+'K'}}}} }
+});
+
+// Ch2: Cumulative rate
+new Chart(document.getElementById('ch2'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'Cumulative Rate', data: MD.map(function(m){return m.cum_rate}), borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,.08)', fill: true, tension: .3, pointRadius: 2 },
+      { label: '8% Threshold', data: MD.map(function(){return 8}), borderColor: 'rgba(251,191,36,.4)', borderDash: [5,5], pointRadius: 0 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top',labels:{boxWidth:10,padding:10}}}, scales:{y:{ticks:{callback:function(v){return v+'%'}},min:0,max:15}} }
+});
+
+// Ch3: Revenue by method
+new Chart(document.getElementById('ch3'), {
+  type: 'bar',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'Card', data: MD.map(function(m){return m.card_rev}), backgroundColor: '#60a5fa', stack: 'a' },
+      { label: 'Splitit', data: MD.map(function(m){return m.split_rev}), backgroundColor: '#f87171', stack: 'a' },
+      { label: 'Other', data: MD.map(function(m){return m.other_rev}), backgroundColor: '#a78bfa', stack: 'a' }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top',labels:{boxWidth:10,padding:10}}}, scales:{y:{stacked:true,ticks:{callback:function(v){return '$'+Math.round(v/1000)+'K'}}},x:{stacked:true}} }
+});
+
+// Ch4: Refunds by method
+new Chart(document.getElementById('ch4'), {
+  type: 'bar',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'Card Refunds', data: MD.map(function(m){return m.card_ref}), backgroundColor: 'rgba(96,165,250,.6)', stack: 'a' },
+      { label: 'Splitit Refunds', data: MD.map(function(m){return m.split_ref}), backgroundColor: '#f87171', stack: 'a' },
+      { label: 'Other Refunds', data: MD.map(function(m){return m.other_ref}), backgroundColor: 'rgba(167,139,250,.5)', stack: 'a' }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top',labels:{boxWidth:10,padding:10}}}, scales:{y:{stacked:true,ticks:{callback:function(v){return '$'+Math.round(v/1000)+'K'}}},x:{stacked:true}} }
+});
+
+// Ch5: Velocity
+new Chart(document.getElementById('ch5'), {
+  type: 'bar',
+  data: {
+    labels: VD.map(function(v){return v.window}),
+    datasets: [
+      { label: 'Card', data: VD.map(function(v){return v.card}), backgroundColor: '#60a5fa', stack: 'a' },
+      { label: 'Splitit', data: VD.map(function(v){return v.splitit}), backgroundColor: '#f87171', stack: 'a' },
+      { label: 'Other', data: VD.map(function(v){return v.other}), backgroundColor: '#a78bfa', stack: 'a' }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top',labels:{boxWidth:10,padding:10}}}, scales:{y:{stacked:true,ticks:{callback:function(v){return '$'+Math.round(v/1000)+'K'}}},x:{stacked:true}} }
+});
+
+// Ch6: Dispute scatter
+var scatterData = DD.map(function(d) {
+  var color = d.status === 'won' ? '#34d399' : d.status === 'lost' ? '#f87171' : '#fbbf24';
+  var border = d.method === 'card' ? '#60a5fa' : d.method === 'splitit' ? '#f87171' : '#c084fc';
+  return { x: d.days, y: d.amount, color: color, border: border, label: d.customer + ' $' + d.amount + ' ' + d.reason + ' ' + d.method + ' ' + d.status };
+});
+new Chart(document.getElementById('ch6'), {
+  type: 'bubble',
+  data: {
+    datasets: [{
+      data: scatterData.map(function(d) { return {x: d.x, y: d.y, r: Math.max(Math.sqrt(d.y/500)*3, 4)}; }),
+      backgroundColor: scatterData.map(function(d) { return d.color + '88'; }),
+      borderColor: scatterData.map(function(d) { return d.border; }),
+      borderWidth: 2
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: function(ctx) { return scatterData[ctx.dataIndex].label; } } }
+    },
+    scales: {
+      x: { title: { display: true, text: 'Days after purchase', color: '#7b7b96' }, ticks: { callback: function(v) { return v + 'd'; } } },
+      y: { title: { display: true, text: 'Dispute amount', color: '#7b7b96' }, ticks: { callback: function(v) { return '$' + Math.round(v/1000) + 'K'; } } }
+    }
+  }
+});
+
+// Ch7: Exposure composition
+new Chart(document.getElementById('ch7'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Voluntary ($256K)', 'Resolution Lost ($97K)', 'Dispute-Forced ($19K)', 'Pure Dispute Lost ($59K)', 'Pending ($13K)', 'Voluntary+Won ($7K)'],
+    datasets: [{ data: [255617,96960,19498,59398,12542,7250], backgroundColor: ['#60a5fa','#c084fc','#f87171','rgba(248,113,113,.5)','#fbbf24','rgba(251,191,36,.5)'], borderWidth: 0 }]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right',labels:{boxWidth:10,padding:8,font:{size:10}}}} }
+});
+</script>
+</body></html>
